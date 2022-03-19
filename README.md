@@ -1,0 +1,4 @@
+- 👋 Hi, I’m Iman Imtiaz
+- 👀 I’m interested in Programming , web development and photography.
+- 🌱 I’m currently learning computer science from Nust.
+- 📫 You can contact me via my email imanimtiaz2001@gmail.com
