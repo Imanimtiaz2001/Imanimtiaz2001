@@ -20,7 +20,10 @@ class PlanRequest(BaseModel):
     @field_validator("destination")
     @classmethod
     def clean_destination(cls, value: str) -> str:
-        return " ".join(value.strip().split())
+        cleaned = " ".join(value.strip().split())
+        if len(cleaned) < 2:
+            raise ValueError("Enter a destination with at least two characters")
+        return cleaned
 
     @field_validator("interests")
     @classmethod
@@ -54,8 +57,8 @@ class Evidence(BaseModel):
 class Activity(BaseModel):
     name: str
     category: str
-    duration_hours: float
-    estimated_cost_usd: int = 0  # per traveler
+    duration_hours: float = Field(gt=0, le=8)
+    estimated_cost_usd: int = Field(default=0, ge=0)  # per traveler
     indoor: bool = False
     description: str
     map_url: str
@@ -64,7 +67,7 @@ class Activity(BaseModel):
 
 class Offer(BaseModel):
     title: str
-    amount_usd: int  # total group/trip for flight; group/night for hotel
+    amount_usd: int = Field(ge=0)  # total group/trip for flight; group/night for hotel
     currency: str = "USD"
     status: Literal["live_offer", "planning_allowance"]
     search_url: str
@@ -74,14 +77,15 @@ class Offer(BaseModel):
 class WeatherDay(BaseModel):
     date: date
     temperature_max_c: float | None = None
-    precipitation_probability: int | None = None
+    precipitation_probability: int | None = Field(default=None, ge=0, le=100)
 
 
 class ScheduleItem(BaseModel):
     time: str
+    end_time: str | None = None
     title: str
     detail: str
-    estimated_cost_usd: int  # total group
+    estimated_cost_usd: int = Field(ge=0)  # total group
     map_url: str | None = None
     category: str
 
@@ -96,7 +100,7 @@ class PlanDay(BaseModel):
 
 class CostLine(BaseModel):
     label: str
-    amount_usd: int
+    amount_usd: int = Field(ge=0)
     basis: str
     status: Literal["live_offer", "estimate", "allowance"]
 

@@ -35,7 +35,7 @@ flowchart TD
     P --> D["Saved plan + API + UI"]
 ```
 
-Each specialist writes a different typed state field, so LangGraph can run them in the same superstep. The orchestrator waits for all four, ranks reviewed places against interest tags, schedules one to three activities per day according to pace, and prefers indoor places when forecast rain probability is high. An optional LLM can reorder only the supplied catalogue names; unknown names, duplicates, malformed output, or network failure fall back to deterministic ordering. The pricing agent owns the final arithmetic and never lets an LLM set a monetary figure.
+Each specialist writes a different typed state field, so LangGraph can run them in the same superstep. The orchestrator waits for all four, ranks reviewed places against interest tags, schedules up to three activities per day according to pace, and prefers indoor places when forecast rain probability is high. It reserves affordable activities for later days and uses activity durations, lunch, and transit buffers to avoid overlapping time blocks. An optional LLM can reorder only the supplied catalogue names; unknown names, duplicates, malformed output, or network failure fall back to deterministic ordering. The pricing agent owns the final arithmetic and never lets an LLM set a monetary figure.
 
 **Request:** `destination`, inclusive `start_date`/`end_date` (1–7 days), total `budget_usd`, `travelers`, `interests`, optional `origin_iata`, and `pace`. **Response:** a `TravelPlan` with an evidence-tagged flight reserve/offer and hotel allowance/offer, dated schedule, group costs, line-item budget, caveats, and per-agent trace. `POST /api/plans` creates and persists it; `GET /api/plans/{uuid}` restores a shareable plan. `GET /api/destinations` lists reviewed cities. `GET /api/health` supports health checks.
 
@@ -50,7 +50,7 @@ Each specialist writes a different typed state field, so LangGraph can run them 
 | Amadeus sandbox | Optional sample search | Sample planning figure, never a bookable offer |
 | Offline allowances | Hotel nights, meals, transit and optional flight reserve | Explicit planning estimate, never a fare or booking |
 
-All amounts are group totals in USD. The trip dates are inclusive; check-out and return travel are the **day after** the last itinerary day. The ledger calculates `flight + hotel × nights + activities + meals + transit + ceil(10% contingency)`. A plan above budget is clearly marked infeasible rather than silently dropping costs. If departure airport is missing, flights are excluded and the omission is stated. Discovered places with unknown entry fees can make totals incomplete, so that is also stated. For long stays, the itinerary includes flexible days instead of repeating attractions.
+All amounts are group totals in USD. The trip dates are inclusive; check-out and return travel are the **day after** the last itinerary day. The ledger calculates `flight + hotel × nights + activities + meals + transit + ceil(10% contingency)`. The activity scheduler spends only what remains after fixed allowances and contingency; if fixed costs already exceed the budget, the plan is marked infeasible. If departure airport is missing or matches the destination code, flights are excluded and the omission is stated. Discovered places with unknown entry fees can make totals incomplete, so that is also stated. For long stays, the itinerary includes flexible days instead of repeating attractions. Forecasts are shown only within the provider horizon, including partial coverage of a trip.
 
 ## Why these choices
 
@@ -70,7 +70,7 @@ ruff check app tests
 pytest -q
 ```
 
-Tests cover parallel graph completion, no repeated anchors on a short trip, exact cost conservation, unaffordable trips, validation, and API persistence. Provider calls are replaced with deterministic test doubles; a passing test does **not** assert that third-party availability is current. External integrations have bounded timeouts and are optional. The public Overpass service has usage limits; use your own provider or instance for high traffic.
+Tests cover parallel graph completion, cost and non-overlap invariants across trip shapes, budget-limited choices, ambiguous destinations, provider failures, validation, and API persistence. Provider calls are replaced with deterministic test doubles; a passing test does **not** assert that third-party availability is current. External integrations have bounded timeouts and are optional. The public Overpass service has usage limits; use your own provider or instance for high traffic.
 
 ## Tradeoffs and extensions
 

@@ -6,10 +6,22 @@ import time
 from datetime import UTC, timedelta
 
 import httpx
+from pydantic import ValidationError
 
 from app.models import Activity, Evidence, Offer, PlanRequest, WeatherDay
 
 _cache: dict[str, tuple[float, object]] = {}
+
+
+def _remember(key: str, value: object, ttl: int) -> None:
+    now = time.monotonic()
+    if len(_cache) >= 256:
+        for old_key, (expiry, _) in list(_cache.items()):
+            if expiry <= now:
+                del _cache[old_key]
+        if len(_cache) >= 256:
+            del _cache[min(_cache, key=lambda item: _cache[item][0])]
+    _cache[key] = (now + ttl, value)
 
 
 async def _cached_json(url: str, params: dict, ttl: int = 3600) -> dict:
@@ -22,7 +34,9 @@ async def _cached_json(url: str, params: dict, ttl: int = 3600) -> dict:
         response = await client.get(url, params=params)
         response.raise_for_status()
         data = response.json()
-    _cache[key] = (time.monotonic() + ttl, data)
+        if not isinstance(data, dict):
+            raise TypeError("Expected a JSON object from provider")
+    _remember(key, data, ttl)
     return data
 
 
@@ -32,7 +46,7 @@ async def geocode(destination: str) -> tuple[float, float] | None:
                                   {"name": destination, "count": 1, "language": "en"}, 86400)
         match = (data.get("results") or [None])[0]
         return (match["latitude"], match["longitude"]) if match else None
-    except (httpx.HTTPError, ValueError, KeyError, TypeError):
+    except (httpx.HTTPError, ValueError, KeyError, TypeError, IndexError):
         return None
 
 
@@ -40,7 +54,8 @@ async def weather_for(destination: str, request: PlanRequest) -> list[WeatherDay
     # Forecasts outside the provider's horizon would create false precision.
     from datetime import datetime
 
-    if (request.end_date - datetime.now(UTC).date()).days > 15:
+    horizon = datetime.now(UTC).date() + timedelta(days=15)
+    if request.start_date > horizon:
         return []
     point = await geocode(destination)
     if not point:
@@ -50,13 +65,13 @@ async def weather_for(destination: str, request: PlanRequest) -> list[WeatherDay
             "latitude": point[0], "longitude": point[1],
             "daily": "temperature_2m_max,precipitation_probability_max",
             "timezone": "auto", "start_date": str(request.start_date),
-            "end_date": str(request.end_date),
+            "end_date": str(min(request.end_date, horizon)),
         }, 1800)
         daily = data["daily"]
         return [WeatherDay(date=d, temperature_max_c=t, precipitation_probability=p)
                 for d, t, p in zip(daily["time"], daily["temperature_2m_max"],
                                    daily["precipitation_probability_max"])]
-    except (httpx.HTTPError, ValueError, KeyError, TypeError):
+    except (httpx.HTTPError, ValueError, KeyError, TypeError, ValidationError):
         return []
 
 
@@ -74,13 +89,18 @@ async def osm_activities(destination: str) -> list[Activity]:
         return []
     found: list[Activity] = []
     seen: set[str] = set()
-    for element in data.get("elements", []):
+    for element in data.get("elements") or []:
+        if not isinstance(element, dict) or element.get("type") not in ("node", "way", "relation") \
+                or not isinstance(element.get("id"), int):
+            continue
         tags = element.get("tags", {})
+        if not isinstance(tags, dict):
+            continue
         name = tags.get("name:en") or tags.get("name")
-        if not name or name.casefold() in seen or len(name) > 100:
+        if not isinstance(name, str) or not name or name.casefold() in seen or len(name) > 100:
             continue
         seen.add(name.casefold())
-        category = tags.get("tourism", "attraction")
+        category = tags.get("tourism") if isinstance(tags.get("tourism"), str) else "attraction"
         found.append(Activity(
             name=name, category=category + " culture history art sightseeing",
             duration_hours=2, estimated_cost_usd=0, indoor=category in ("museum", "gallery"),
@@ -107,7 +127,7 @@ class Amadeus:
         return bool(self.client_id and self.client_secret)
 
     async def _token(self, client: httpx.AsyncClient) -> str:
-        key = "amadeus:" + self.base
+        key = "amadeus:" + self.base + ":" + str(self.client_id)
         if key in _cache and _cache[key][0] > time.monotonic():
             return str(_cache[key][1])
         response = await client.post(self.base + "/v1/security/oauth2/token", data={
@@ -117,7 +137,7 @@ class Amadeus:
         response.raise_for_status()
         data = response.json()
         token = data["access_token"]
-        _cache[key] = (time.monotonic() + max(60, data.get("expires_in", 1200) - 90), token)
+        _remember(key, token, max(60, data.get("expires_in", 1200) - 90))
         return token
 
     async def _get(self, path: str, params: dict) -> dict:
@@ -139,7 +159,9 @@ class Amadeus:
                 "returnDate": str(request.end_date + timedelta(days=1)),
                 "adults": request.travelers, "currencyCode": "USD", "max": 10,
             })
-            offers = [o for o in data.get("data", []) if o.get("price", {}).get("total")]
+            offers = [o for o in data.get("data", []) if o.get("price", {}).get("total")
+                      and o["price"].get("currency", "USD") == "USD"
+                      and float(o["price"]["total"]) > 0]
             if not offers:
                 return None
             best = min(offers, key=lambda o: float(o["price"]["total"]))
@@ -152,7 +174,7 @@ class Amadeus:
                                            kind="live" if self.is_production else "estimate",
                                            note="Production offer; recheck before booking." if self.is_production
                                            else "Amadeus sandbox sample; not bookable."))
-        except (httpx.HTTPError, ValueError, KeyError, TypeError):
+        except (httpx.HTTPError, ValueError, KeyError, TypeError, OverflowError):
             return None
 
     async def hotel(self, request: PlanRequest, destination_iata: str) -> Offer | None:
@@ -166,13 +188,17 @@ class Amadeus:
                 return None
             data = await self._get("/v3/shopping/hotel-offers", {
                 "hotelIds": ",".join(ids), "adults": request.travelers,
+                "roomQuantity": math.ceil(request.travelers / 2),
                 "checkInDate": str(request.start_date),
                 "checkOutDate": str(request.end_date + timedelta(days=1)),
                 "currency": "USD", "bestRateOnly": "true",
             })
             options = [(h, offer) for h in data.get("data", [])
                        for offer in h.get("offers", [])
-                       if offer.get("price", {}).get("total")]
+                       if offer.get("price", {}).get("total")
+                       and offer["price"].get("currency", "USD") == "USD"
+                       and int(offer.get("roomQuantity", 1)) == math.ceil(request.travelers / 2)
+                       and float(offer["price"]["total"]) > 0]
             if not options:
                 return None
             hotel, offer = min(options, key=lambda pair: float(pair[1]["price"]["total"]))
@@ -185,5 +211,5 @@ class Amadeus:
                                            kind="live" if self.is_production else "estimate",
                                            note="Nightly share of quoted stay; verify taxes/room capacity."
                                            if self.is_production else "Amadeus sandbox sample; not bookable."))
-        except (httpx.HTTPError, ValueError, KeyError, TypeError):
+        except (httpx.HTTPError, ValueError, KeyError, TypeError, OverflowError):
             return None

@@ -101,8 +101,15 @@ DESTINATIONS = {
 
 
 def get_destination(name: str):
-    key = name.casefold().split(",")[0].strip()
-    return DESTINATIONS.get(key)
+    normalized = " ".join(name.casefold().strip().split())
+    aliases = {"istanbul, turkey": "istanbul", "london, uk": "london",
+               "dubai, united arab emirates": "dubai"}
+    if normalized in aliases:
+        return DESTINATIONS[aliases[normalized]]
+    for key, data in DESTINATIONS.items():
+        if normalized in (key, data[0].casefold()):
+            return data
+    return None
 
 
 def activities_for(name: str) -> list[Activity]:

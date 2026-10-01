@@ -55,9 +55,10 @@ def trace(agent: str, outcome: str, kind: str, started: float) -> list[AgentTrac
 async def research_flight(state: State) -> State:
     started = time.monotonic()
     req = state["request"]
+    same_city = bool(req.origin_iata and req.origin_iata == state.get("destination_code"))
     offer = (await Amadeus().flight(req, state["destination_code"])
-             if state.get("destination_code") and req.origin_iata else None)
-    if offer is None and req.origin_iata:
+             if state.get("destination_code") and req.origin_iata and not same_city else None)
+    if offer is None and req.origin_iata and not same_city:
         # This is a user-editable reserve, deliberately not represented as a fare.
         offer = Offer(title=f"Flight reserve · from {req.origin_iata}",
                       amount_usd=600 * req.travelers, status="planning_allowance",
@@ -65,7 +66,7 @@ async def research_flight(state: State) -> State:
                       evidence=Evidence(source="Planning allowance", kind="estimate",
                                         note="Generic reserve, not a fare or availability quote."))
     return {"flight": offer, "trace": trace("flights", "Offer found" if offer and
-            offer.status == "live_offer" else "Allowance or origin needed", "live" if offer and
+            offer.status == "live_offer" else "Allowance or origin not applicable", "live" if offer and
             offer.status == "live_offer" else "estimate", started)}
 
 
@@ -146,6 +147,10 @@ def rank_activities(req: PlanRequest, activities: list[Activity]) -> list[Activi
         -len(interests.intersection(a.category.split())), a.estimated_cost_usd, a.name))
 
 
+def clock(minutes: int) -> str:
+    return f"{minutes // 60:02d}:{minutes % 60:02d}"
+
+
 async def compose(state: State) -> State:
     started = time.monotonic()
     req = state["request"]
@@ -162,59 +167,94 @@ async def compose(state: State) -> State:
     meal_daily = max(22, round(state["city_rate"] * .35)) * req.travelers
     transit_daily = max(7, round(state["city_rate"] * .12)) * req.travelers
     anchors_per_day = {"relaxed": 1, "balanced": 2, "busy": 3}[req.pace]
+    fixed_costs = (state["hotel"].amount_usd * count +
+                   (state["flight"].amount_usd if state["flight"] else 0) +
+                   (meal_daily + transit_daily) * count)
+    activity_budget = max(0, math.floor(req.budget_usd / 1.10) - fixed_costs)
+    selected_count = 0
     for i in range(count):
         current = req.start_date + timedelta(days=i)
         forecast = weather.get(current)
-        # Prefer indoor plans on likely wet days, preserving interest order otherwise.
-        if forecast and forecast.precipitation_probability is not None and \
-                forecast.precipitation_probability >= 65:
-            indoor = next((a for a in remaining if a.indoor), None)
-            activity = indoor or (remaining[0] if remaining else None)
-        else:
-            activity = remaining[0] if remaining else None
-        if activity:
-            remaining.remove(activity)
-        morning = ScheduleItem(time="09:30", title=activity.name if activity else "Flexible city day",
-                               detail=activity.description if activity else
-                               "Use this day for a local walk or a place you discover during the trip.",
-                               estimated_cost_usd=(activity.estimated_cost_usd * req.travelers
-                                                   if activity else 0),
-                               map_url=activity.map_url if activity else None,
-                               category="activity")
-        lunch = ScheduleItem(time="12:30", title="Lunch break", detail="Choose a local spot nearby.",
-                             estimated_cost_usd=round(meal_daily * .4), category="food")
-        afternoon = ScheduleItem(time="15:00", title="Explore at your own pace",
-                                 detail="Leave room for transit, rest, and spontaneous discoveries.",
-                                 estimated_cost_usd=transit_daily, category="local transit")
-        dinner = ScheduleItem(time="19:00", title="Dinner", detail="Try a neighborhood restaurant.",
-                              estimated_cost_usd=meal_daily - lunch.estimated_cost_usd,
-                              category="food")
-        items = [morning, lunch]
-        for slot in range(anchors_per_day - 1):
-            if not remaining:
+        wet = bool(forecast and forecast.precipitation_probability is not None and
+                   forecast.precipitation_probability >= 65)
+        items: list[ScheduleItem] = []
+        theme = "Open day"
+        next_start = 9 * 60
+        for slot in range(anchors_per_day):
+            # Lunch and transfers are actual time blocks, so an attraction cannot overlap them.
+            if slot == 1:
+                lunch_start = max(12 * 60, next_start + 15)
+                items.append(ScheduleItem(time=clock(lunch_start),
+                                          end_time=clock(lunch_start + 60),
+                                          title="Lunch break", detail="Choose a local spot nearby.",
+                                          estimated_cost_usd=round(meal_daily * .4),
+                                          category="food"))
+                next_start = lunch_start + 90
+            elif slot > 1:
+                next_start += 30
+
+            eligible = [a for a in remaining if a.estimated_cost_usd * req.travelers <=
+                        activity_budget and next_start + math.ceil(a.duration_hours * 60) <=
+                        18 * 60 + 30]
+            if slot > 0 and len([a for a in remaining if
+                                 a.estimated_cost_usd * req.travelers <= activity_budget]) <= \
+                    count - i - 1:
+                # Save scarce affordable places as a first activity on future days.
                 break
-            extra = remaining.pop(0)
-            items.append(ScheduleItem(time="14:00" if slot == 0 else "16:30",
-                                      title=extra.name, detail=extra.description,
-                                      estimated_cost_usd=extra.estimated_cost_usd * req.travelers,
-                                      map_url=extra.map_url, category="activity"))
-        items.extend([afternoon, dinner] if anchors_per_day == 1 else [dinner])
-        if anchors_per_day > 1:
-            # Transit remains a separate allowance, even on a full sightseeing day.
-            items.insert(-1, ScheduleItem(time="18:00", title="Local transit and buffer",
-                                          detail="Allow time to cross the city and rest.",
-                                          estimated_cost_usd=transit_daily,
-                                          category="local transit"))
-        days.append(PlanDay(date=current, theme=activity.name if activity else "Open day",
-                            weather=forecast, items=items,
+            if wet:
+                eligible.sort(key=lambda a: not a.indoor)
+            if not eligible:
+                if slot == 0:
+                    items.append(ScheduleItem(time="09:00", end_time="10:00",
+                                              title="Flexible city day",
+                                              detail="Explore a local area or rest; add verified places as you go.",
+                                              estimated_cost_usd=0, category="free time"))
+                    next_start = 10 * 60
+                break
+            activity = eligible[0]
+            remaining.remove(activity)
+            selected_count += 1
+            activity_budget -= activity.estimated_cost_usd * req.travelers
+            end = next_start + math.ceil(activity.duration_hours * 60)
+            items.append(ScheduleItem(time=clock(next_start), end_time=clock(end),
+                                      title=activity.name, detail=activity.description,
+                                      estimated_cost_usd=activity.estimated_cost_usd * req.travelers,
+                                      map_url=activity.map_url, category="activity"))
+            if slot == 0:
+                theme = activity.name
+            next_start = end
+        if not any(item.category == "food" for item in items):
+            lunch_start = max(12 * 60, next_start + 15)
+            items.append(ScheduleItem(time=clock(lunch_start), end_time=clock(lunch_start + 60),
+                                      title="Lunch break", detail="Choose a local spot nearby.",
+                                      estimated_cost_usd=round(meal_daily * .4), category="food"))
+            next_start = lunch_start + 60
+        if next_start < 16 * 60 + 30:
+            items.append(ScheduleItem(time=clock(next_start), end_time="16:30",
+                                      title="Unstructured afternoon",
+                                      detail="Rest or find a nearby indoor stop." if wet else
+                                      "Explore nearby streets or take a break.",
+                                      estimated_cost_usd=0, category="free time"))
+            next_start = 16 * 60 + 30
+        transit_start = max(next_start, 17 * 60)
+        items.append(ScheduleItem(time=clock(transit_start), end_time=clock(transit_start + 30),
+                                  title="Local transit and buffer",
+                                  detail="Allow time to cross the city and rest.",
+                                  estimated_cost_usd=transit_daily, category="local transit"))
+        dinner_start = max(19 * 60, transit_start + 30)
+        items.append(ScheduleItem(time=clock(dinner_start), end_time=clock(dinner_start + 60),
+                                  title="Dinner", detail="Try a neighborhood restaurant.",
+                                  estimated_cost_usd=meal_daily - round(meal_daily * .4),
+                                  category="food"))
+        days.append(PlanDay(date=current, theme=theme, weather=forecast, items=items,
                             estimated_cost_usd=sum(x.estimated_cost_usd for x in items)))
     label = state["destination_label"]
     return {"days": days,
             "headline": f"Your {count}-day journey through {label}",
             "summary": f"A {req.pace} trip shaped around {', '.join(req.interests[:3])}. "
             "Daily activities are paced to leave room for meals and transit.",
-            "trace": trace("orchestrator", f"{count} days composed",
-                           "live" if ranking else "deterministic", started)}
+            "trace": trace("orchestrator", f"{count} days / {selected_count} activities",
+                           "model" if ranking else "deterministic", started)}
 
 
 def audit_budget(state: State) -> State:
@@ -233,7 +273,9 @@ def audit_budget(state: State) -> State:
     contingency = math.ceil(subtotal * .10)
     lines = [
         CostLine(label="Flights", amount_usd=flight_total,
-                 basis="Group round trip" if state["flight"] else "Origin not supplied; excluded",
+                 basis="Group round trip" if state["flight"] else
+                 ("Same-city departure; excluded" if req.origin_iata == state.get("destination_code")
+                  else "Origin not supplied; excluded"),
                  status=("live_offer" if state["flight"] and
                          state["flight"].status == "live_offer" else "allowance")),
         CostLine(label="Stay", amount_usd=hotel_total, basis=f"{nights} nights, group total",
@@ -252,16 +294,37 @@ def audit_budget(state: State) -> State:
                 "taxes, opening hours, visa rules, accessibility and availability before paying.")]
     if not req.origin_iata:
         caveats.append("No departure airport was supplied, so flights are excluded from the total.")
+    elif req.origin_iata == state.get("destination_code"):
+        caveats.append("Departure and destination codes match, so flights are excluded.")
     elif not state["flight"] or state["flight"].status != "live_offer":
-        caveats.append("Flight amount is a generic reserve, not a fare. Replace it with a real quote.")
+        caveats.append("Flight amount is an Amadeus sandbox sample, not a bookable fare."
+                       if state["flight"] and state["flight"].evidence.source.startswith("Amadeus")
+                       else "Flight amount is a generic reserve, not a fare. Replace it with a real quote.")
     if state["hotel"].status != "live_offer":
-        caveats.append("Hotel amount is an allowance, not a property booking or confirmed rate.")
+        caveats.append("Hotel amount is an Amadeus sandbox sample, not a bookable rate."
+                       if state["hotel"].evidence.source.startswith("Amadeus")
+                       else "Hotel amount is an allowance, not a property booking or confirmed rate.")
+    if not state.get("destination_code"):
+        caveats.append("This destination is outside the reviewed catalogue; stay and daily "
+                       "allowances use a generic city tier.")
     if not state["weather"]:
         caveats.append("No date-specific weather forecast was available for this trip.")
+    elif len({day.date for day in state["weather"] if req.start_date <= day.date <= req.end_date}) \
+            < len(state["days"]):
+        caveats.append("Weather forecasts cover only part of this trip; later days have no forecast yet.")
     if any(a.evidence.source == "OpenStreetMap via Overpass" for a in state["activities"]):
         caveats.append("Discovered place entry fees are unknown and excluded from this estimate.")
     if not state["activities"]:
         caveats.append("Place discovery was unavailable; flexible days need your own activity choices.")
+    elif not any(item.category == "activity" for day in state["days"] for item in day.items):
+        caveats.append("No listed activity fits the remaining budget; the schedule leaves time open.")
+    elif any(day.theme == "Open day" for day in state["days"]):
+        caveats.append("Some days are flexible because the available place list or budget is limited.")
+    chosen = sum(item.category == "activity" for day in state["days"] for item in day.items)
+    target = len(state["days"]) * {"relaxed": 1, "balanced": 2, "busy": 3}[req.pace]
+    if state["activities"] and chosen < target:
+        caveats.append("The requested pace was reduced where budget, place supply, or time allowed "
+                       "fewer activities.")
     if total > req.budget_usd:
         caveats.append(f"This plan exceeds your budget by ${total - req.budget_usd:,}. "
                        "Raise the budget or compare cheaper stays and flights.")
