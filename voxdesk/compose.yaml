@@ -1,0 +1,67 @@
+services:
+  api:
+    build: .
+    image: voxdesk:local
+    ports: ["127.0.0.1:8000:8000"]
+    environment:
+      PROVIDER: ${PROVIDER:-openai}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-http://localhost:8000}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      DATABASE_URL: postgresql+asyncpg://voxdesk:${POSTGRES_PASSWORD:-voxdesk_dev_only}@postgres:5432/voxdesk
+      REDIS_URL: redis://redis:6379/0
+      CHAT_MODEL: ${CHAT_MODEL:-gpt-4.1-mini}
+      STT_MODEL: ${STT_MODEL:-gpt-4o-mini-transcribe}
+      TTS_MODEL: ${TTS_MODEL:-gpt-4o-mini-tts}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
+      REQUESTS_PER_MINUTE: ${REQUESTS_PER_MINUTE:-30}
+      WHISPER_MODEL: ${WHISPER_MODEL:-base}
+      WHISPER_DEVICE: cpu
+      LOCAL_CHAT_MODEL: ${LOCAL_CHAT_MODEL:-qwen2.5:3b}
+      LOCAL_EMBEDDING_MODEL: ${LOCAL_EMBEDDING_MODEL:-nomic-embed-text}
+      PROVIDER_TIMEOUT: ${PROVIDER_TIMEOUT:-90}
+      TURN_TIMEOUT: ${TURN_TIMEOUT:-240}
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      migrate: {condition: service_completed_successfully}
+    volumes: ["speech-cache:/home/voxdesk/.cache"]
+    restart: unless-stopped
+    init: true
+    mem_limit: 3g
+    cpus: 2
+    security_opt: ["no-new-privileges:true"]
+  migrate:
+    image: voxdesk:local
+    build: .
+    command: ["/app/.venv/bin/alembic", "upgrade", "head"]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://voxdesk:${POSTGRES_PASSWORD:-voxdesk_dev_only}@postgres:5432/voxdesk
+    depends_on:
+      postgres: {condition: service_healthy}
+  postgres:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_DB: voxdesk
+      POSTGRES_USER: voxdesk
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-voxdesk_dev_only}
+    volumes: ["postgres-data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U voxdesk -d voxdesk"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+    restart: unless-stopped
+  redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--maxmemory", "64mb", "--maxmemory-policy", "noeviction"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+    restart: unless-stopped
+volumes:
+  postgres-data:
+  speech-cache:

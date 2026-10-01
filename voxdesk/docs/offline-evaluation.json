@@ -1,0 +1,49 @@
+{
+  "kind": "offline_lexical_and_fixture_vector_regression",
+  "provider": "fixture",
+  "model": "deterministic hash embeddings; not a semantic model benchmark",
+  "case_count": 8,
+  "retrieval_pass_count": 8,
+  "results": [
+    {
+      "id": "db",
+      "retrieved": 2,
+      "retrieval_pass": true
+    },
+    {
+      "id": "privacy",
+      "retrieved": 1,
+      "retrieval_pass": true
+    },
+    {
+      "id": "cloud",
+      "retrieved": 2,
+      "retrieval_pass": true
+    },
+    {
+      "id": "deployment",
+      "retrieved": 1,
+      "retrieval_pass": true
+    },
+    {
+      "id": "tts",
+      "retrieved": 2,
+      "retrieval_pass": true
+    },
+    {
+      "id": "retry",
+      "retrieved": 1,
+      "retrieval_pass": true
+    },
+    {
+      "id": "unsupported",
+      "retrieved": 0,
+      "retrieval_pass": true
+    },
+    {
+      "id": "injection",
+      "retrieved": 1,
+      "retrieval_pass": true
+    }
+  ]
+}

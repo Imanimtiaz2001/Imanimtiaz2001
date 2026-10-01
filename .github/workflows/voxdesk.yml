@@ -1,0 +1,73 @@
+name: VoxDesk checks
+on:
+  push:
+    paths: ["voxdesk/**", ".github/workflows/voxdesk.yml"]
+  pull_request:
+    paths: ["voxdesk/**", ".github/workflows/voxdesk.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: voxdesk
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_DB: voxdesk
+          POSTGRES_USER: voxdesk
+          POSTGRES_PASSWORD: test_only
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U voxdesk -d voxdesk" --health-interval 5s --health-timeout 5s --health-retries 20
+      redis:
+        image: redis:7.4-alpine
+        ports: ["6379:6379"]
+        options: --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.8.22"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: voxdesk/frontend/package-lock.json
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - run: uv sync --frozen --extra dev
+      - run: uv run --no-sync ruff check backend migrations scripts
+      - run: uv run --no-sync ruff format --check backend migrations scripts
+      - name: Verify schema migration and metadata
+        env:
+          DATABASE_URL: postgresql+asyncpg://voxdesk:test_only@localhost:5432/voxdesk
+        run: |
+          uv run --no-sync alembic upgrade head
+          uv run --no-sync alembic check
+      - name: Backend and infrastructure tests
+        env:
+          TEST_POSTGRES_URL: postgresql+asyncpg://voxdesk:test_only@localhost:5432/voxdesk
+          TEST_REDIS_URL: redis://localhost:6379/0
+        run: uv run --no-sync pytest --cov=voxdesk --cov-report=term-missing
+      - run: uv run --no-sync python scripts/evaluate.py
+      - run: npm ci --prefix frontend
+      - run: npm test --prefix frontend
+      - run: npm run build --prefix frontend
+      - run: cd frontend && npx playwright install --with-deps chromium && npm run e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: voxdesk-test-traces
+          path: voxdesk/frontend/test-results/
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate both deployment profiles
+        run: |
+          cd voxdesk
+          docker compose config --quiet
+          docker compose -f compose.yaml -f compose.local.yaml config --quiet
+          docker build -t voxdesk:ci .

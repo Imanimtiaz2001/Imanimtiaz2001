@@ -1,0 +1,29 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "voxdesk"
+version = "1.0.0"
+description = "A grounded multimodal voice assistant with observable STT → LLM → TTS orchestration"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.115,<1", "uvicorn[standard]>=0.34,<1", "python-multipart>=0.0.20,<1",
+  "pydantic-settings>=2.8,<3", "sqlalchemy[asyncio]>=2.0.38,<3", "aiosqlite>=0.21,<1",
+  "asyncpg>=0.30,<1", "pgvector>=0.4,<1", "openai>=2.0,<3", "langgraph>=1.0,<2",
+  "httpx[socks]>=0.28,<1", "redis>=6,<7", "prometheus-client>=0.22,<1", "numpy>=2,<3",
+  "alembic>=1.15,<2"
+]
+[project.optional-dependencies]
+local = ["faster-whisper>=1.2,<2"]
+dev = ["pytest>=8.3,<9", "pytest-asyncio>=0.26,<1", "pytest-cov>=6,<7", "ruff>=0.11,<1"]
+[tool.hatch.build.targets.wheel]
+packages = ["backend/voxdesk"]
+[tool.pytest.ini_options]
+testpaths = ["backend/tests"]
+asyncio_mode = "auto"
+[tool.ruff]
+line-length = 100
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ASYNC"]
+ignore = ["E501", "B008"]

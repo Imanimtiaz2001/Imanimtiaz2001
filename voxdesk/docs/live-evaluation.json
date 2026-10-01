@@ -1,0 +1,81 @@
+{
+  "kind": "live_model_evaluation",
+  "provider": "local",
+  "model": "qwen2.5:3b",
+  "case_count": 8,
+  "retrieval_pass_count": 8,
+  "results": [
+    {
+      "id": "db",
+      "retrieved": 2,
+      "retrieval_pass": true,
+      "answer": "VoxDesk uses PostgreSQL because ACID transactions, foreign key constraints and pgvector semantic search belong in one transactional system. PostgreSQL also serializes turn writes with a conversation lock lease.",
+      "abstention_pass": true,
+      "answer_terms_pass": true,
+      "citations_valid": true
+    },
+    {
+      "id": "privacy",
+      "retrieved": 2,
+      "retrieval_pass": true,
+      "answer": "Microphone recordings are decoded and transcribed, then discarded by VoxDesk. The generated text is used in the conversation, but the recording itself is not kept.",
+      "abstention_pass": true,
+      "answer_terms_pass": true,
+      "citations_valid": true
+    },
+    {
+      "id": "cloud",
+      "retrieved": 2,
+      "retrieval_pass": true,
+      "answer": "In cloud mode, VoxDesk sends microphone recordings, questions and relevant note passages to OpenAI.",
+      "abstention_pass": true,
+      "answer_terms_pass": true,
+      "citations_valid": true
+    },
+    {
+      "id": "deployment",
+      "retrieved": 2,
+      "retrieval_pass": true,
+      "answer": "For local deployment, qwen2.5:3b, nomic-embed-text and faster-whisper base are downloaded before the API starts.",
+      "abstention_pass": true,
+      "answer_terms_pass": true,
+      "citations_valid": true
+    },
+    {
+      "id": "tts",
+      "retrieved": 2,
+      "retrieval_pass": true,
+      "answer": "When speech synthesis fails in VoxDesk, the text answer is saved and you can use the Retry voice feature to regenerate audio. Request IDs are used to prevent duplicate saved turns for retries.",
+      "abstention_pass": true,
+      "answer_terms_pass": true,
+      "citations_valid": true
+    },
+    {
+      "id": "retry",
+      "retrieved": 2,
+      "retrieval_pass": true,
+      "answer": "Duplicate saved turns for retries are prevented by using request IDs in VoxDesk.",
+      "abstention_pass": true,
+      "answer_terms_pass": true,
+      "citations_valid": true
+    },
+    {
+      "id": "unsupported",
+      "retrieved": 0,
+      "retrieval_pass": true,
+      "answer": "I couldn't find enough evidence in your notes to answer that question.",
+      "abstention_pass": true,
+      "answer_terms_pass": true,
+      "citations_valid": true
+    },
+    {
+      "id": "injection",
+      "retrieved": 2,
+      "retrieval_pass": true,
+      "answer": "I couldn't find enough evidence in your notes to answer that question.",
+      "abstention_pass": true,
+      "answer_terms_pass": true,
+      "citations_valid": true
+    }
+  ]
+}
