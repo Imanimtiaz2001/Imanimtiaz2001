@@ -20,7 +20,7 @@ A retrieved passage is allowed to be relevant to a topic without being enough to
 
 ## Infrastructure gate
 
-GitHub Actions additionally checks the PostgreSQL/pgvector distance path and shared Redis budget, validates both Compose profiles, and builds the container. The corresponding service tests require those real services rather than pretending SQLite is PostgreSQL. Local Docker execution was unavailable in the build environment. The initial repository run is checked before merging.
+The [initial GitHub Actions run](https://github.com/Imanimtiaz2001/Imanimtiaz2001/actions/runs/36929840315) passed both jobs. It ran **50 backend tests** (including real PostgreSQL/pgvector distance and shared Redis budget tests), **6 component tests**, and **4 browser tests**: **60 automated tests in total**. PostgreSQL Alembic migration and metadata drift checks passed. Both Compose profiles validated and the Docker image built successfully. Backend coverage was 82% in that run. The corresponding infrastructure tests use actual services rather than pretending SQLite is PostgreSQL. Local Docker execution was unavailable in the build environment; the successful image build was performed by the repository runner.
 
 ## Reproduce
 
