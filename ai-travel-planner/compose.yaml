@@ -1,0 +1,31 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+psycopg://wayfinder:wayfinder@db:5432/wayfinder
+      AMADEUS_CLIENT_ID: ${AMADEUS_CLIENT_ID:-}
+      AMADEUS_CLIENT_SECRET: ${AMADEUS_CLIENT_SECRET:-}
+      AMADEUS_BASE_URL: ${AMADEUS_BASE_URL:-https://test.api.amadeus.com}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-mini}
+      USER_AGENT: ${USER_AGENT:-WayfinderPortfolio/1.0 (contact: portfolio@example.com)}
+    depends_on:
+      db:
+        condition: service_healthy
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: wayfinder
+      POSTGRES_PASSWORD: wayfinder
+      POSTGRES_DB: wayfinder
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wayfinder -d wayfinder"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+volumes:
+  pgdata:

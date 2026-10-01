@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#102d2b">
+  <title>Wayfinder — The trip, thoughtfully planned.</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar shell">
+    <a class="brand" href="/" aria-label="Wayfinder home"><span class="brand-mark">✦</span> wayfinder<span class="brand-dot">.</span></a>
+    <nav><a href="#how">How it works</a><a href="#planner">Plan a trip</a><a href="/docs" target="_blank" rel="noreferrer">API docs ↗</a></nav>
+  </header>
+  <main>
+    <section class="hero shell">
+      <div class="hero-copy">
+        <div class="eyebrow"><span class="pulse"></span> INTELLIGENT TRAVEL PLANNING</div>
+        <h1>Go somewhere<br><em>wonderful.</em></h1>
+        <p class="hero-sub">A thoughtful itinerary built around your time, interests and budget. Four specialist agents work together, so the details add up.</p>
+        <a class="primary-button" href="#planner">Plan your journey <span>↗</span></a>
+        <div class="hero-proof"><span>✧ Curated places</span><span>✧ Transparent budgets</span><span>✧ Realistic schedules</span></div>
+      </div>
+      <div class="hero-art" aria-hidden="true">
+        <div class="art-sun"></div><div class="art-circle circle-one"></div><div class="art-circle circle-two"></div>
+        <div class="art-hill hill-back"></div><div class="art-hill hill-front"></div>
+        <div class="art-card"><span class="art-card-top">YOUR NEXT CHAPTER</span><strong>Somewhere<br>new awaits.</strong><span class="art-card-foot">01 / ∞ &nbsp; ↗</span></div>
+        <span class="art-star star-a">✦</span><span class="art-star star-b">✧</span>
+      </div>
+    </section>
+    <section class="planner-section" id="planner">
+      <div class="shell planner-grid">
+        <div class="planner-intro"><span class="section-label">01 / CREATE YOUR JOURNEY</span><h2>Tell us what<br>moves you<span class="accent">.</span></h2><p>Just the essentials. Your specialist agents will do the research, connect the dots, and show their working.</p>
+          <div class="agent-list"><div><b>01</b><span>Flights & routes</span><small>Travel reserve or provider offers</small></div><div><b>02</b><span>Stays</span><small>Nightly costs and practical choices</small></div><div><b>03</b><span>Experiences</span><small>Places matched to your interests</small></div><div><b>04</b><span>Budget audit</span><small>Every cost, in one clear ledger</small></div></div>
+        </div>
+        <form id="planner-form" class="form-card">
+          <div class="form-heading"><span class="form-icon">✧</span><div><h3>Build my itinerary</h3><p>Where will you go next?</p></div></div>
+          <label>Destination <span class="required">*</span><input id="destination" name="destination" list="destinations" placeholder="e.g. Istanbul" required minlength="2" autocomplete="off"><datalist id="destinations"></datalist></label>
+          <div class="field-row"><label>Arrival date <span class="required">*</span><input id="start_date" name="start_date" type="date" required></label><label>Last day <span class="required">*</span><input id="end_date" name="end_date" type="date" required></label></div>
+          <div class="field-row"><label>Total budget <span class="required">*</span><span class="input-prefix"><span>$</span><input id="budget_usd" name="budget_usd" type="number" min="100" max="100000" value="1800" required></span></label><label>Travelers<input id="travelers" name="travelers" type="number" min="1" max="8" value="1" required></label></div>
+          <label>What interests you? <span class="required">*</span><input id="interests" name="interests" placeholder="Food, history, art, nature..." value="history, food, culture" required><small class="hint">Separate interests with commas (up to 8)</small></label>
+          <div class="field-row"><label>Departure airport <span class="optional">optional</span><input id="origin_iata" name="origin_iata" maxlength="3" placeholder="e.g. KHI" pattern="[A-Za-z]{3}"><small class="hint">3-letter IATA code</small></label><label>Travel pace<select id="pace" name="pace"><option value="relaxed">Relaxed</option><option value="balanced" selected>Balanced</option><option value="busy">Busy</option></select></label></div>
+          <div class="form-note">✧ &nbsp; Flights without a live quote are shown as a reserve. No bookings are made.</div>
+          <button class="submit-button" type="submit">Create my trip <span>↗</span></button>
+          <div id="form-error" class="form-error" role="alert" hidden></div>
+        </form>
+      </div>
+    </section>
+    <section id="results" class="results shell" hidden aria-live="polite"></section>
+    <section class="how shell" id="how"><span class="section-label">02 / HOW IT WORKS</span><h2>Good trips take<br><em>good thinking.</em></h2><div class="how-grid"><article><span>01</span><h3>Share your plans</h3><p>Choose a destination, dates, a total budget, and the things you love.</p></article><article><span>02</span><h3>Agents collaborate</h3><p>Specialists research travel, stays, places and weather in parallel.</p></article><article><span>03</span><h3>Travel with clarity</h3><p>See a day-by-day plan, source notes, and an auditable cost breakdown.</p></article></div></section>
+  </main>
+  <footer><div class="shell footer-inner"><span class="brand">✦ wayfinder<span class="brand-dot">.</span></span><span>Built for curious travelers. Plan well, wander far.</span><a href="https://github.com/Imanimtiaz2001" target="_blank" rel="noreferrer">GitHub ↗</a></div></footer>
+</body>
+</html>
