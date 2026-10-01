@@ -132,6 +132,25 @@ async def test_same_city_departure_excludes_flights():
 
 
 @pytest.mark.asyncio
+async def test_unreviewed_destination_declares_generic_costs():
+    with patch("app.planner.weather_for", new_callable=AsyncMock, return_value=[]), \
+         patch("app.planner.osm_activities", new_callable=AsyncMock, return_value=[]):
+        plan = await create_plan(request(destination="Paris, Texas"))
+    assert plan.destination_label == "Paris, Texas"
+    assert plan.hotel.evidence.source == "Destination tier estimate"
+    assert any("generic city tier" in caveat for caveat in plan.caveats)
+
+
+def test_provider_cache_is_bounded(monkeypatch):
+    from app import providers
+
+    monkeypatch.setattr(providers, "_cache", {})
+    for number in range(300):
+        providers._remember(f"key-{number}", number, 3600)
+    assert len(providers._cache) <= 256
+
+
+@pytest.mark.asyncio
 async def test_malformed_weather_and_map_results_degrade_gracefully():
     req = request(start_date=datetime.now(UTC).date() + timedelta(days=2),
                   end_date=datetime.now(UTC).date() + timedelta(days=4))

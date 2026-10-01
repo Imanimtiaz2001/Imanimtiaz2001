@@ -13,6 +13,17 @@ from app.models import Activity, Evidence, Offer, PlanRequest, WeatherDay
 _cache: dict[str, tuple[float, object]] = {}
 
 
+def _remember(key: str, value: object, ttl: int) -> None:
+    now = time.monotonic()
+    if len(_cache) >= 256:
+        for old_key, (expiry, _) in list(_cache.items()):
+            if expiry <= now:
+                del _cache[old_key]
+        if len(_cache) >= 256:
+            del _cache[min(_cache, key=lambda item: _cache[item][0])]
+    _cache[key] = (now + ttl, value)
+
+
 async def _cached_json(url: str, params: dict, ttl: int = 3600) -> dict:
     key = url + repr(sorted(params.items()))
     if key in _cache and _cache[key][0] > time.monotonic():
@@ -25,7 +36,7 @@ async def _cached_json(url: str, params: dict, ttl: int = 3600) -> dict:
         data = response.json()
         if not isinstance(data, dict):
             raise TypeError("Expected a JSON object from provider")
-    _cache[key] = (time.monotonic() + ttl, data)
+    _remember(key, data, ttl)
     return data
 
 
@@ -126,7 +137,7 @@ class Amadeus:
         response.raise_for_status()
         data = response.json()
         token = data["access_token"]
-        _cache[key] = (time.monotonic() + max(60, data.get("expires_in", 1200) - 90), token)
+        _remember(key, token, max(60, data.get("expires_in", 1200) - 90))
         return token
 
     async def _get(self, path: str, params: dict) -> dict:

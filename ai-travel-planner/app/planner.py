@@ -304,6 +304,9 @@ def audit_budget(state: State) -> State:
         caveats.append("Hotel amount is an Amadeus sandbox sample, not a bookable rate."
                        if state["hotel"].evidence.source.startswith("Amadeus")
                        else "Hotel amount is an allowance, not a property booking or confirmed rate.")
+    if not state.get("destination_code"):
+        caveats.append("This destination is outside the reviewed catalogue; stay and daily "
+                       "allowances use a generic city tier.")
     if not state["weather"]:
         caveats.append("No date-specific weather forecast was available for this trip.")
     elif len({day.date for day in state["weather"] if req.start_date <= day.date <= req.end_date}) \
