@@ -1,0 +1,1 @@
+"""VoxDesk multimodal assistant."""

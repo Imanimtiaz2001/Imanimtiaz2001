@@ -1,0 +1,20 @@
+{
+  "kind": "real_local_model_smoke",
+  "input": "synthetic English speech, not a human microphone accuracy benchmark",
+  "stt_model": "base",
+  "chat_model": "qwen2.5:3b",
+  "tts_model": "espeak-ng",
+  "embedding_model": "ollama:nomic-embed-text:768",
+  "transcript": "What happened to microphone recordings?",
+  "answer": "Microphone recordings are considered transient by VoxDesk, meaning they are discarded after transcription. The generated answer audio is stored until the conversation is deleted.",
+  "citations": 1,
+  "timings": {
+    "transcription_ms": 12475.3,
+    "retrieval_ms": 253.78,
+    "answer_ms": 11614.55,
+    "speech_ms": 20.91,
+    "total_ms": 24376.42
+  },
+  "output_audio_bytes": 470574,
+  "passed": true
+}
