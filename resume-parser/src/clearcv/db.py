@@ -29,6 +29,7 @@ class Store:
         self.engine = create_engine(
             url,
             pool_pre_ping=True,
+            hide_parameters=True,
             connect_args={"check_same_thread": False, "timeout": 30}
             if parsed.drivername.startswith("sqlite")
             else {},

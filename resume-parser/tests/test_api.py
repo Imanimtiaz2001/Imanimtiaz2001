@@ -202,3 +202,21 @@ def test_provider_consent_and_unsupported_facts(settings, monkeypatch):
         assert response.status_code == 502
         assert response.json()["error"]["code"] == "unsupported_evidence"
         assert client.get("/api/resumes").json()["items"] == []
+
+
+def test_unexpected_errors_do_not_log_resume_data(settings, monkeypatch, caplog):
+    import logging
+
+    app = create_app(settings)
+
+    def fail_save(*args):
+        raise ValueError("candidate-sensitive-123")
+
+    monkeypatch.setattr(app.state.store, "save", fail_save)
+    caplog.set_level(logging.INFO, logger="clearcv.requests")
+    with TestClient(app, raise_server_exceptions=False) as client:
+        response = upload(client)
+        assert response.status_code == 500
+        assert response.json()["error"]["code"] == "internal_error"
+        assert "candidate-sensitive-123" not in response.text + caplog.text
+        assert response.headers["X-Content-Type-Options"] == "nosniff"

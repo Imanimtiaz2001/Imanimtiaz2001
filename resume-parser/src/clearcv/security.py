@@ -25,10 +25,12 @@ class Guard:
         started = time.perf_counter()
         headers = {key.lower(): value for key, value in scope["headers"]}
         status = 500
+        response_started = False
 
         async def secured_send(message):
-            nonlocal status
+            nonlocal status, response_started
             if message["type"] == "http.response.start":
+                response_started = True
                 status = message["status"]
                 message["headers"] = [
                     *message.get("headers", []),
@@ -115,6 +117,19 @@ class Guard:
                 finally:
                     self.upload_slots.release()
             return await self.app(scope, receive, secured_send)
+        except Exception as exc:
+            logger.error(
+                json.dumps(
+                    {
+                        "event": "request_failed",
+                        "request_id": request_id,
+                        "error_type": type(exc).__name__,
+                    }
+                )
+            )
+            if response_started:
+                raise
+            await error(500, "internal_error", "The request could not be completed. Retry later.")
         finally:
             logger.info(
                 json.dumps(
