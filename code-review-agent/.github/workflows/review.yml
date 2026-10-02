@@ -1,0 +1,26 @@
+name: Review changed Python files
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+  pull-requests: write
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      # Run trusted base-branch code; fetch PR source as data instead of checking it out.
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -e .
+      - name: Review changed Python files
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          REVIEWLINE_PR_NUMBER: ${{ github.event.pull_request.number }}
+          REVIEWLINE_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: python -m reviewline.action

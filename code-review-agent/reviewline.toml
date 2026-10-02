@@ -1,0 +1,7 @@
+[review]
+ignore = []
+max_line_length = 100
+max_file_bytes = 200000
+llm_max_lines = 100
+llm_max_findings = 12
+
