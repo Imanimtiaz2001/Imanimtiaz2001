@@ -1,0 +1,420 @@
+{
+  "$defs": {
+    "Document": {
+      "additionalProperties": false,
+      "properties": {
+        "lines": {
+          "items": {
+            "$ref": "#/$defs/SourceLine"
+          },
+          "title": "Lines",
+          "type": "array"
+        },
+        "page_count": {
+          "title": "Page Count",
+          "type": "integer"
+        },
+        "ocr_pages": {
+          "items": {
+            "type": "integer"
+          },
+          "title": "Ocr Pages",
+          "type": "array"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "lines",
+        "page_count",
+        "ocr_pages",
+        "warnings"
+      ],
+      "title": "Document",
+      "type": "object"
+    },
+    "Education": {
+      "additionalProperties": false,
+      "properties": {
+        "institution": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Fact"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "degree": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Fact"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "graduation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Fact"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "institution",
+        "degree",
+        "graduation"
+      ],
+      "title": "Education",
+      "type": "object"
+    },
+    "Employment": {
+      "additionalProperties": false,
+      "properties": {
+        "employer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Fact"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "role": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Fact"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "start": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Fact"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "end": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Fact"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "employer",
+        "role",
+        "start",
+        "end"
+      ],
+      "title": "Employment",
+      "type": "object"
+    },
+    "ExperienceEstimate": {
+      "additionalProperties": false,
+      "properties": {
+        "lower_months": {
+          "minimum": 0,
+          "title": "Lower Months",
+          "type": "integer"
+        },
+        "upper_months": {
+          "minimum": 0,
+          "title": "Upper Months",
+          "type": "integer"
+        },
+        "lower_years": {
+          "minimum": 0,
+          "title": "Lower Years",
+          "type": "number"
+        },
+        "upper_years": {
+          "minimum": 0,
+          "title": "Upper Years",
+          "type": "number"
+        },
+        "dated_roles": {
+          "title": "Dated Roles",
+          "type": "integer"
+        },
+        "excluded_roles": {
+          "title": "Excluded Roles",
+          "type": "integer"
+        },
+        "as_of": {
+          "title": "As Of",
+          "type": "string"
+        },
+        "policy": {
+          "title": "Policy",
+          "type": "string"
+        }
+      },
+      "required": [
+        "lower_months",
+        "upper_months",
+        "lower_years",
+        "upper_years",
+        "dated_roles",
+        "excluded_roles",
+        "as_of",
+        "policy"
+      ],
+      "title": "ExperienceEstimate",
+      "type": "object"
+    },
+    "Fact": {
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "maxLength": 300,
+          "minLength": 1,
+          "title": "Value",
+          "type": "string"
+        },
+        "quote": {
+          "maxLength": 1200,
+          "minLength": 1,
+          "title": "Quote",
+          "type": "string"
+        },
+        "line_ids": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 8,
+          "minItems": 1,
+          "title": "Line Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "value",
+        "quote",
+        "line_ids"
+      ],
+      "title": "Fact",
+      "type": "object"
+    },
+    "ParseResult": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0",
+          "default": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "provider": {
+          "enum": [
+            "local",
+            "openai"
+          ],
+          "title": "Provider",
+          "type": "string"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Model"
+        },
+        "prompt_version": {
+          "title": "Prompt Version",
+          "type": "string"
+        },
+        "review_required": {
+          "const": true,
+          "default": true,
+          "title": "Review Required",
+          "type": "boolean"
+        },
+        "fields": {
+          "$ref": "#/$defs/ResumeFields"
+        },
+        "experience": {
+          "$ref": "#/$defs/ExperienceEstimate"
+        },
+        "document": {
+          "$ref": "#/$defs/Document"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        },
+        "timings_ms": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "title": "Timings Ms",
+          "type": "object"
+        }
+      },
+      "required": [
+        "provider",
+        "model",
+        "prompt_version",
+        "fields",
+        "experience",
+        "document",
+        "warnings",
+        "timings_ms"
+      ],
+      "title": "ParseResult",
+      "type": "object"
+    },
+    "ResumeFields": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Fact"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "skills": {
+          "items": {
+            "$ref": "#/$defs/Fact"
+          },
+          "maxItems": 150,
+          "title": "Skills",
+          "type": "array"
+        },
+        "employment": {
+          "items": {
+            "$ref": "#/$defs/Employment"
+          },
+          "maxItems": 50,
+          "title": "Employment",
+          "type": "array"
+        },
+        "education": {
+          "items": {
+            "$ref": "#/$defs/Education"
+          },
+          "maxItems": 30,
+          "title": "Education",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "skills",
+        "employment",
+        "education"
+      ],
+      "title": "ResumeFields",
+      "type": "object"
+    },
+    "SourceLine": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "page": {
+          "minimum": 1,
+          "title": "Page",
+          "type": "integer"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "bbox": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Bbox"
+        },
+        "method": {
+          "enum": [
+            "text",
+            "ocr"
+          ],
+          "title": "Method",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "page",
+        "text",
+        "bbox",
+        "method"
+      ],
+      "title": "SourceLine",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    },
+    "expires_at": {
+      "title": "Expires At",
+      "type": "string"
+    },
+    "result": {
+      "$ref": "#/$defs/ParseResult"
+    }
+  },
+  "required": [
+    "id",
+    "created_at",
+    "expires_at",
+    "result"
+  ],
+  "title": "StoredResume",
+  "type": "object"
+}

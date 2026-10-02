@@ -1,0 +1,99 @@
+{
+  "provider": "local",
+  "corpus": "six synthetic fixtures; not a general accuracy benchmark",
+  "as_of": "2026-10-02",
+  "cases": [
+    {
+      "case": "standard",
+      "schema_valid": true,
+      "evidence_valid": true,
+      "name_exact": true,
+      "skills_exact": true,
+      "employment_exact": true,
+      "education_exact": true,
+      "experience_months": [
+        69,
+        69
+      ],
+      "latency_ms": 238.4
+    },
+    {
+      "case": "sidebar",
+      "schema_valid": true,
+      "evidence_valid": true,
+      "name_exact": true,
+      "skills_exact": true,
+      "employment_exact": true,
+      "education_exact": true,
+      "experience_months": [
+        69,
+        69
+      ],
+      "latency_ms": 222.2
+    },
+    {
+      "case": "scanned",
+      "schema_valid": true,
+      "evidence_valid": true,
+      "name_exact": true,
+      "skills_exact": true,
+      "employment_exact": true,
+      "education_exact": true,
+      "experience_months": [
+        69,
+        69
+      ],
+      "latency_ms": 745.6
+    },
+    {
+      "case": "unicode",
+      "schema_valid": true,
+      "evidence_valid": true,
+      "name_exact": true,
+      "skills_exact": true,
+      "employment_exact": true,
+      "education_exact": true,
+      "experience_months": [
+        69,
+        69
+      ],
+      "latency_ms": 227.8
+    },
+    {
+      "case": "year-only",
+      "schema_valid": true,
+      "evidence_valid": true,
+      "name_exact": true,
+      "skills_exact": true,
+      "employment_exact": true,
+      "education_exact": true,
+      "experience_months": [
+        48,
+        69
+      ],
+      "latency_ms": 225.1
+    },
+    {
+      "case": "sparse",
+      "schema_valid": true,
+      "evidence_valid": true,
+      "name_exact": true,
+      "skills_exact": true,
+      "employment_exact": true,
+      "education_exact": true,
+      "experience_months": [
+        0,
+        0
+      ],
+      "latency_ms": 220.0
+    }
+  ],
+  "aggregate": {
+    "name_exact_match": 1.0,
+    "employment_exact_match": 1.0,
+    "education_exact_match": 1.0,
+    "skills_precision": 1.0,
+    "skills_recall": 1.0,
+    "skills_f1": 1.0
+  }
+}
