@@ -4,6 +4,7 @@ Software engineer focused on AI applications, Python backends, and reliable prod
 
 ## Featured projects
 
+- [ClearCV — Evidence-grounded Resume Parser](resume-parser/) — FastAPI, React/TypeScript, schema-constrained LLM extraction, OCR, source verification, PostgreSQL, overlap-aware experience calculation, and measured regression tests.
 - [VoxDesk — Multimodal Voice Assistant](voxdesk/) — Real STT → LLM → TTS, LangGraph, FastAPI, React/TypeScript, hybrid RAG, PostgreSQL/pgvector, Redis, local and OpenAI models, and tested voice failure recovery.
 - [Wayfinder — Multi-Agent AI Travel Planner](ai-travel-planner/) — LangGraph orchestration, FastAPI, typed agent contracts, PostgreSQL, optional travel and weather integrations, and a verifiable budget ledger.
 

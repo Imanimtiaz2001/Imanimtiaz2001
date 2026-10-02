@@ -1,0 +1,851 @@
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import ReactDOM from "react-dom/client";
+import {
+  ArrowDownToLine,
+  ArrowUpRight,
+  Check,
+  ChevronRight,
+  FileCheck2,
+  FileText,
+  LoaderCircle,
+  LockKeyhole,
+  ScanLine,
+  ShieldCheck,
+  Trash2,
+  Upload,
+  X,
+} from "lucide-react";
+import type { Config, Fact, HistoryItem, RecordResult } from "./types";
+import "./style.css";
+
+const examples = [
+  "standard",
+  "sidebar",
+  "scanned",
+  "unicode",
+  "year-only",
+  "sparse",
+];
+
+const FactButton = ({
+  fact,
+  label,
+  activeFact,
+  onSelect,
+}: {
+  fact: Fact | null;
+  label?: string;
+  activeFact: Fact | null;
+  onSelect: (fact: Fact) => void;
+}) =>
+  fact ? (
+    <button
+      className={`fact ${activeFact === fact ? "selected" : ""}`}
+      title="Show source evidence"
+      onClick={() => onSelect(fact)}
+    >
+      {label && <small>{label}</small>}
+      <span>{fact.value}</span>
+      <ArrowUpRight size={13} />
+    </button>
+  ) : (
+    <span className="unknown">{label ? `${label}: ` : ""}Not found</span>
+  );
+
+function App() {
+  const [mobileHistory, setMobileHistory] = useState(false);
+  const [config, setConfig] = useState<Config | null>(null);
+  const [apiKey, setApiKey] = useState("");
+  const [locked, setLocked] = useState(false);
+  const [keyInput, setKeyInput] = useState("");
+  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [offset, setOffset] = useState(0);
+  const [record, setRecord] = useState<RecordResult | null>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [actionBusy, setActionBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [activeFact, setActiveFact] = useState<Fact | null>(null);
+  const [tab, setTab] = useState<"fields" | "json">("fields");
+  const [consent, setConsent] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const input = useRef<HTMLInputElement>(null);
+
+  const request = useCallback(
+    async (path: string, options: RequestInit = {}) => {
+      const headers = new Headers(options.headers);
+      if (apiKey) headers.set("X-API-Key", apiKey);
+      const response = await fetch(path, { ...options, headers });
+      if (!response.ok) {
+        if (response.status === 401) {
+          setLocked(true);
+          setRecord(null);
+          setHistory([]);
+        }
+        const body = await response.json().catch(() => null);
+        throw new Error(
+          body?.error?.message ?? `Request failed (${response.status}).`,
+        );
+      }
+      return response;
+    },
+    [apiKey],
+  );
+
+  const loadHistory = useCallback(
+    async (page = 0) => {
+      const response = await request(`/api/resumes?limit=8&offset=${page}`);
+      const body = await response.json();
+      setHistory(body.items);
+      setOffset(page);
+    },
+    [request],
+  );
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const response = await request("/api/config");
+        const data = await response.json();
+        if (!alive) return;
+        setConfig(data);
+        setLocked(false);
+        setError("");
+        await loadHistory();
+      } catch (err) {
+        if (alive) setError((err as Error).message);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [request, loadHistory]);
+
+  useEffect(() => {
+    if (!activeFact) return;
+    document
+      .getElementById(activeFact.line_ids[0])
+      ?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [activeFact]);
+
+  function choose(selected: File | undefined) {
+    if (!selected) return;
+    setError("");
+    if (!selected.name.toLowerCase().endsWith(".pdf")) {
+      setError("Choose a PDF file.");
+      return;
+    }
+    if (config && selected.size > config.max_upload_bytes) {
+      setError("This PDF exceeds the upload limit.");
+      return;
+    }
+    if (!selected.size) {
+      setError("This file is empty.");
+      return;
+    }
+    setFile(selected);
+    setRecord(null);
+    setActiveFact(null);
+    setDeleteConfirm(false);
+  }
+
+  async function parse() {
+    if (!file || busy) return;
+    setBusy(true);
+    setError("");
+    setActiveFact(null);
+    setDeleteConfirm(false);
+    const body = new FormData();
+    body.append("file", file);
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 180000);
+    try {
+      const response = await request(`/api/resumes?consent=${consent}`, {
+        method: "POST",
+        body,
+        signal: controller.signal,
+      });
+      const result = await response.json();
+      setRecord(result);
+      setTab("fields");
+      await loadHistory();
+    } catch (err) {
+      setError(
+        (err as Error).name === "AbortError"
+          ? "The request timed out. Refresh history before retrying; extraction may have completed."
+          : (err as Error).message,
+      );
+    } finally {
+      window.clearTimeout(timeout);
+      setBusy(false);
+    }
+  }
+
+  async function demo(caseName: string) {
+    setActionBusy(true);
+    setError("");
+    try {
+      const response = await request(`/api/examples/${caseName}`);
+      choose(
+        new File([await response.blob()], `${caseName}.pdf`, {
+          type: "application/pdf",
+        }),
+      );
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
+  async function open(id: string) {
+    setActionBusy(true);
+    setError("");
+    try {
+      const response = await request(`/api/resumes/${id}`);
+      setRecord(await response.json());
+      setMobileHistory(false);
+      setActiveFact(null);
+      setDeleteConfirm(false);
+      setTab("fields");
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
+  async function exportFile(format: string) {
+    if (!record) return;
+    setActionBusy(true);
+    setError("");
+    try {
+      const response = await request(
+        `/api/resumes/${record.id}/export?format=${format}`,
+      );
+      const url = URL.createObjectURL(await response.blob());
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `resume-${record.id}.${format}`;
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
+  async function remove() {
+    if (!record) return;
+    setActionBusy(true);
+    setError("");
+    try {
+      await request(`/api/resumes/${record.id}`, { method: "DELETE" });
+      setRecord(null);
+      setActiveFact(null);
+      setDeleteConfirm(false);
+      await loadHistory();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
+  const result = record?.result;
+  const years = result
+    ? result.experience.lower_years === result.experience.upper_years
+      ? `${result.experience.lower_years}`
+      : `${result.experience.lower_years}–${result.experience.upper_years}`
+    : "—";
+
+  return (
+    <div className="app">
+      <aside className={`sidebar ${mobileHistory ? "mobile-open" : ""}`}>
+        <a className="brand" href="/" aria-label="ClearCV home">
+          <div className="brand-icon">
+            <ScanLine size={22} />
+          </div>
+          <span>
+            ClearCV<small>RESUME INTELLIGENCE</small>
+          </span>
+        </a>
+        <button
+          className="mobile-history-toggle"
+          aria-expanded={mobileHistory}
+          onClick={() => setMobileHistory(!mobileHistory)}
+        >
+          Recent documents
+        </button>
+        <div className="nav-label">WORKSPACE</div>
+        <div className="nav-active">
+          <FileCheck2 size={18} /> Resume parser <span>01</span>
+        </div>
+        <div className="history-title">
+          <span>RECENT DOCUMENTS</span>
+          <button
+            disabled={busy || actionBusy || locked}
+            onClick={() => {
+              setError("");
+              loadHistory(offset).catch((err) => setError(err.message));
+            }}
+            aria-label="Refresh history"
+          >
+            ↻
+          </button>
+        </div>
+        <div className="history">
+          {history.length ? (
+            history.map((item) => (
+              <button
+                key={item.id}
+                disabled={busy || actionBusy}
+                className={`history-item ${record?.id === item.id ? "active" : ""}`}
+                onClick={() => open(item.id)}
+              >
+                <FileText size={16} />
+                <span>
+                  {item.name ?? "Unknown name"}
+                  <small>
+                    {new Date(item.created_at).toLocaleDateString()} ·{" "}
+                    {item.provider}
+                  </small>
+                </span>
+                <ChevronRight size={14} />
+              </button>
+            ))
+          ) : (
+            <p className="history-empty">
+              Your parsed documents
+              <br />
+              will appear here.
+            </p>
+          )}
+        </div>
+        <div className="pages">
+          <button
+            disabled={offset === 0 || busy || actionBusy || locked}
+            onClick={() =>
+              loadHistory(Math.max(0, offset - 8)).catch((err) =>
+                setError(err.message),
+              )
+            }
+          >
+            Previous
+          </button>
+          <button
+            disabled={history.length < 8 || busy || actionBusy || locked}
+            onClick={() =>
+              loadHistory(offset + 8).catch((err) => setError(err.message))
+            }
+          >
+            Next
+          </button>
+        </div>
+        <div className="sidebar-note">
+          <ShieldCheck size={21} />
+          <strong>Evidence before assumptions.</strong>
+          <p>Every extracted field links back to the document it came from.</p>
+        </div>
+        <div className="profile">
+          <div className="avatar">CV</div>
+          <span>
+            Recruiting workspace<small>Single team · schema v1.0</small>
+          </span>
+        </div>
+      </aside>
+
+      <main>
+        <header>
+          <span>
+            Workspace <ChevronRight size={13} /> <strong>Resume parser</strong>
+          </span>
+          <div className="mode">
+            <i />
+            {config?.provider === "openai"
+              ? "AI extraction"
+              : "Offline extraction"}
+            <LockKeyhole size={14} />
+          </div>
+        </header>
+        <section className="heading">
+          <div className="eyebrow">DOCUMENTS → DECISIONS</div>
+          <h1>
+            Good data starts
+            <br className="mobile-break" /> with a clear resume.
+          </h1>
+          <p>
+            Turn a PDF into structured fields. Trace every detail to its source.
+          </p>
+          <div className="step-row">
+            <span>
+              <b>1</b> Upload a resume
+            </span>
+            <ChevronRight size={13} />
+            <span>
+              <b>2</b> Check the evidence
+            </span>
+            <ChevronRight size={13} />
+            <span>
+              <b>3</b> Export your data
+            </span>
+          </div>
+        </section>
+
+        {locked && (
+          <form
+            className="key-form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              setApiKey(keyInput);
+            }}
+          >
+            <LockKeyhole size={18} />
+            <label htmlFor="operator-key">Operator API key</label>
+            <input
+              id="operator-key"
+              type="password"
+              value={keyInput}
+              onChange={(e) => setKeyInput(e.target.value)}
+              autoComplete="off"
+              required
+            />
+            <button type="submit">Unlock workspace</button>
+            <small>Kept in memory for this browser tab only.</small>
+          </form>
+        )}
+        {error && (
+          <div className="error" role="alert">
+            <span>{error}</span>
+            <button aria-label="Dismiss error" onClick={() => setError("")}>
+              <X size={16} />
+            </button>
+          </div>
+        )}
+
+        <section className="upload-card">
+          <div className="card-title">
+            <h2>
+              <Upload size={17} /> Add a document
+            </h2>
+            <span>PDF ONLY</span>
+          </div>
+          <div
+            className={`dropzone ${dragging ? "dragging" : ""} ${file ? "has-file" : ""}`}
+            onDragOver={(e) => {
+              e.preventDefault();
+              if (!busy && !actionBusy) setDragging(true);
+            }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragging(false);
+              if (!busy && !actionBusy && !locked)
+                choose(e.dataTransfer.files[0]);
+            }}
+          >
+            <div className="upload-symbol">
+              {file ? <FileText size={25} /> : <Upload size={25} />}
+            </div>
+            <div>
+              <strong>{file ? file.name : "Drop your resume here"}</strong>
+              <p>
+                {file
+                  ? `${(file.size / 1024).toFixed(1)} KB · ready to extract`
+                  : `Text or scanned PDF · up to ${config ? Math.round(config.max_upload_bytes / 1048576) : 10} MB, ${config?.max_pages ?? 10} pages`}
+              </p>
+            </div>
+            <input
+              ref={input}
+              aria-label="Upload resume PDF"
+              type="file"
+              accept=".pdf,application/pdf"
+              hidden
+              onChange={(e) => {
+                choose(e.target.files?.[0]);
+                e.target.value = "";
+              }}
+            />
+            <button
+              className="secondary"
+              disabled={busy || actionBusy || locked || !config}
+              onClick={() => input.current?.click()}
+            >
+              {file ? "Change file" : "Browse files"}
+            </button>
+          </div>
+          <div className="upload-footer">
+            <div>
+              <span className="demo-label">Try a synthetic resume</span>
+              <div className="demo-buttons">
+                {examples.map((name) => (
+                  <button
+                    key={name}
+                    disabled={busy || actionBusy || locked || !config}
+                    onClick={() => demo(name)}
+                  >
+                    {name}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <button
+              className="primary"
+              disabled={
+                !file ||
+                busy ||
+                actionBusy ||
+                locked ||
+                !config ||
+                (config.provider === "openai" && !consent)
+              }
+              onClick={parse}
+            >
+              {busy ? (
+                <>
+                  <LoaderCircle className="spin" size={17} /> Extracting…
+                </>
+              ) : (
+                <>
+                  Extract resume <ArrowUpRight size={17} />
+                </>
+              )}
+            </button>
+          </div>
+          {config?.provider === "openai" && (
+            <label className="consent">
+              <input
+                type="checkbox"
+                checked={consent}
+                onChange={(e) => setConsent(e.target.checked)}
+              />{" "}
+              I have permission to send this resume’s extracted text to OpenAI
+              for processing.
+            </label>
+          )}
+          <p className="privacy">
+            <LockKeyhole size={12} /> Original PDFs are discarded after
+            extraction. Text and results expire after{" "}
+            {config?.retention_hours ?? 24} hours.
+          </p>
+        </section>
+
+        {busy && (
+          <div className="working" role="status">
+            <LoaderCircle className="spin" size={18} /> Reading pages,
+            extracting fields, and checking source evidence. Scanned PDFs may
+            take longer.
+          </div>
+        )}
+
+        {record && result ? (
+          <>
+            <section className="summary-grid">
+              <div>
+                <span>DOCUMENT NAME</span>
+                <strong>{result.fields.name?.value ?? "Name not found"}</strong>
+                <small>
+                  <Check size={12} /> Schema validated · review required
+                </small>
+              </div>
+              <div>
+                <span>DATED EXPERIENCE</span>
+                <strong>
+                  {years} <em>years</em>
+                </strong>
+                <small>
+                  {result.experience.dated_roles} dated roles · overlaps merged
+                </small>
+              </div>
+              <div>
+                <span>EXTRACTION</span>
+                <strong>
+                  {result.document.page_count}{" "}
+                  <em>{result.document.page_count === 1 ? "page" : "pages"}</em>
+                </strong>
+                <small>
+                  {result.provider === "local" ? "Offline rules" : result.model}{" "}
+                  · {(result.timings_ms.total / 1000).toFixed(1)}s
+                </small>
+              </div>
+            </section>
+            <div className="results-grid">
+              <section className="fields-card">
+                <div className="result-header">
+                  <div className="tabs">
+                    <button
+                      className={tab === "fields" ? "active" : ""}
+                      onClick={() => setTab("fields")}
+                    >
+                      Structured fields
+                    </button>
+                    <button
+                      className={tab === "json" ? "active" : ""}
+                      onClick={() => setTab("json")}
+                    >
+                      JSON
+                    </button>
+                  </div>
+                  <span className="validated">
+                    <Check size={12} /> Validated
+                  </span>
+                </div>
+                {tab === "json" ? (
+                  <pre className="json">{JSON.stringify(result, null, 2)}</pre>
+                ) : (
+                  <div className="field-content">
+                    <div className="field-section">
+                      <h3>
+                        01 <span>Candidate</span>
+                      </h3>
+                      <FactButton
+                        activeFact={activeFact}
+                        onSelect={setActiveFact}
+                        fact={result.fields.name}
+                        label="Name"
+                      />
+                    </div>
+                    <div className="field-section">
+                      <h3>
+                        02 <span>Technical skills</span>
+                        <small>{result.fields.skills.length} found</small>
+                      </h3>
+                      <div className="skill-list">
+                        {result.fields.skills.map((skill, i) => (
+                          <FactButton
+                            activeFact={activeFact}
+                            onSelect={setActiveFact}
+                            key={i}
+                            fact={skill}
+                          />
+                        ))}
+                        {!result.fields.skills.length && (
+                          <span className="unknown">No skills found</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="field-section">
+                      <h3>
+                        03 <span>Experience</span>
+                      </h3>
+                      {result.fields.employment.length ? (
+                        result.fields.employment.map((job, i) => (
+                          <div className="entry" key={i}>
+                            <FactButton
+                              activeFact={activeFact}
+                              onSelect={setActiveFact}
+                              fact={job.role}
+                              label="Role"
+                            />
+                            <FactButton
+                              activeFact={activeFact}
+                              onSelect={setActiveFact}
+                              fact={job.employer}
+                              label="Employer"
+                            />
+                            <div className="dates">
+                              <FactButton
+                                activeFact={activeFact}
+                                onSelect={setActiveFact}
+                                fact={job.start}
+                                label="From"
+                              />
+                              <FactButton
+                                activeFact={activeFact}
+                                onSelect={setActiveFact}
+                                fact={job.end}
+                                label="To"
+                              />
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <span className="unknown">
+                          No employment entries found
+                        </span>
+                      )}
+                      <p className="experience-policy">
+                        {result.experience.policy} Calculated as of{" "}
+                        {result.experience.as_of}.
+                      </p>
+                    </div>
+                    <div className="field-section">
+                      <h3>
+                        04 <span>Education</span>
+                      </h3>
+                      {result.fields.education.length ? (
+                        result.fields.education.map((item, i) => (
+                          <div className="entry" key={i}>
+                            <FactButton
+                              activeFact={activeFact}
+                              onSelect={setActiveFact}
+                              fact={item.degree}
+                              label="Degree"
+                            />
+                            <FactButton
+                              activeFact={activeFact}
+                              onSelect={setActiveFact}
+                              fact={item.institution}
+                              label="Institution"
+                            />
+                            <FactButton
+                              activeFact={activeFact}
+                              onSelect={setActiveFact}
+                              fact={item.graduation}
+                              label="Graduation"
+                            />
+                          </div>
+                        ))
+                      ) : (
+                        <span className="unknown">
+                          No education entries found
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+                <div className="export-bar">
+                  <span>
+                    <ShieldCheck size={14} /> Fixed schema · v
+                    {result.schema_version}
+                  </span>
+                  <button
+                    disabled={actionBusy || busy}
+                    onClick={() => exportFile("json")}
+                  >
+                    <ArrowDownToLine size={14} /> JSON
+                  </button>
+                  <button
+                    disabled={actionBusy || busy}
+                    onClick={() => exportFile("csv")}
+                  >
+                    <ArrowDownToLine size={14} /> CSV
+                  </button>
+                </div>
+              </section>
+              <section className="source-card">
+                <div className="card-title">
+                  <h2>
+                    <ScanLine size={17} /> Source evidence
+                  </h2>
+                  <span>
+                    {result.document.ocr_pages.length
+                      ? "OCR + TEXT"
+                      : "PDF TEXT"}
+                  </span>
+                </div>
+                <p className="source-hint">
+                  Click any extracted field to highlight its source.
+                </p>
+                {activeFact && (
+                  <div className="quote">
+                    <small>EXACT SOURCE QUOTE</small>
+                    <p>“{activeFact.quote}”</p>
+                    <span>{activeFact.line_ids.join(" · ")}</span>
+                  </div>
+                )}
+                <div
+                  className="source-lines"
+                  tabIndex={0}
+                  aria-label="Extracted source text"
+                >
+                  {result.document.lines.map((line, i, all) => (
+                    <React.Fragment key={line.id}>
+                      {(i === 0 || all[i - 1].page !== line.page) && (
+                        <div className="page-label">PAGE {line.page}</div>
+                      )}
+                      <div
+                        id={line.id}
+                        className={`source-line ${activeFact?.line_ids.includes(line.id) ? "highlight" : ""}`}
+                      >
+                        <span>{line.id.split("-")[1]}</span>
+                        <p>{line.text}</p>
+                      </div>
+                    </React.Fragment>
+                  ))}
+                </div>
+              </section>
+            </div>
+            <section className="review">
+              <div>
+                <ShieldCheck size={18} />
+                <h3>
+                  Review notes <span>{result.warnings.length}</span>
+                </h3>
+              </div>
+              <ul>
+                {result.warnings.map((warning, i) => (
+                  <li key={i}>{warning}</li>
+                ))}
+              </ul>
+            </section>
+            <div className="record-footer">
+              <span>
+                Expires {new Date(record.expires_at).toLocaleString()}
+              </span>
+              {deleteConfirm ? (
+                <div className="confirm">
+                  Delete this record and its text?
+                  <button disabled={actionBusy || busy} onClick={remove}>
+                    Delete now
+                  </button>
+                  <button onClick={() => setDeleteConfirm(false)}>
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  disabled={actionBusy || busy}
+                  onClick={() => setDeleteConfirm(true)}
+                >
+                  <Trash2 size={14} /> Delete record
+                </button>
+              )}
+            </div>
+          </>
+        ) : (
+          !busy && (
+            <section className="empty-state">
+              <div className="empty-icon">
+                <FileCheck2 size={27} />
+              </div>
+              <h2>A resume, with a little more clarity.</h2>
+              <p>
+                Upload a document to see its name, skills, experience,
+                <br />
+                and education — each connected to source evidence.
+              </p>
+              <div>
+                <span>
+                  <Check size={13} /> Schema validation
+                </span>
+                <span>
+                  <Check size={13} /> Overlap-aware dates
+                </span>
+                <span>
+                  <Check size={13} /> OCR support
+                </span>
+              </div>
+            </section>
+          )
+        )}
+        <footer>
+          <span>ClearCV</span>
+          <p>Built for careful extraction. Human review comes first.</p>
+          <a href="/docs" target="_blank" rel="noreferrer">
+            API reference <ArrowUpRight size={12} />
+          </a>
+        </footer>
+      </main>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")!).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>,
+);

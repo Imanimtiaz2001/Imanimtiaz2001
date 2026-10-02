@@ -1,0 +1,36 @@
+services:
+  app:
+    build: .
+    ports: ["127.0.0.1:8000:8000"]
+    environment:
+      CLEARCV_DATABASE_URL: postgresql+psycopg://clearcv:${POSTGRES_PASSWORD:-clearcv-local-only}@db:5432/clearcv
+      CLEARCV_PROVIDER: ${CLEARCV_PROVIDER:-local}
+      CLEARCV_OPENAI_API_KEY: ${CLEARCV_OPENAI_API_KEY:-}
+      CLEARCV_OPENAI_MODEL: ${CLEARCV_OPENAI_MODEL:-gpt-4.1-mini}
+      CLEARCV_API_KEY: ${CLEARCV_API_KEY:-}
+      CLEARCV_RETENTION_HOURS: ${CLEARCV_RETENTION_HOURS:-24}
+    depends_on:
+      db:
+        condition: service_healthy
+    init: true
+    restart: unless-stopped
+    mem_limit: 2g
+    cpus: 2
+    pids_limit: 128
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+  db:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_USER: clearcv
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-clearcv-local-only}
+      POSTGRES_DB: clearcv
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U clearcv -d clearcv"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+volumes:
+  pgdata:

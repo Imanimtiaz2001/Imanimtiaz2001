@@ -1,0 +1,70 @@
+name: ClearCV CI
+on:
+  push:
+    paths: ['resume-parser/**', '.github/workflows/clearcv.yml']
+  pull_request:
+    paths: ['resume-parser/**', '.github/workflows/clearcv.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: resume-parser
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: clearcv
+          POSTGRES_PASSWORD: ci-only-password
+          POSTGRES_DB: clearcv_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U clearcv -d clearcv_test"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      CLEARCV_TEST_POSTGRES_URL: postgresql+psycopg://clearcv:ci-only-password@127.0.0.1:5432/clearcv_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: '0.8.22'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: resume-parser/web/package-lock.json
+      - run: sudo apt-get update && sudo apt-get install -y tesseract-ocr tesseract-ocr-eng
+      - run: uv sync --frozen --extra dev
+      - run: uv run --frozen --extra dev ruff check src tests scripts
+      - run: uv run --frozen --extra dev ruff format --check src tests scripts
+      - run: uv run --frozen --extra dev pytest --cov=clearcv --cov-report=xml
+      - run: uv run --frozen python scripts/evaluate.py --output /tmp/clearcv-evaluation.json
+      - run: npm ci && npm run build && npx playwright install --with-deps chromium && npm run test:e2e
+        working-directory: resume-parser/web
+      - run: docker build -t clearcv:ci .
+      - run: docker run -d --name clearcv-ci -p 127.0.0.1:8010:8000 clearcv:ci
+      - name: Container smoke test
+        run: |
+          python - <<'PY'
+          import time, urllib.request
+          for attempt in range(30):
+              try:
+                  assert urllib.request.urlopen('http://127.0.0.1:8010/health/ready').status == 200
+                  assert b'ClearCV' in urllib.request.urlopen('http://127.0.0.1:8010/').read()
+                  break
+              except Exception:
+                  time.sleep(1)
+          else:
+              raise SystemExit('Container failed readiness')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: clearcv-verification
+          path: |
+            resume-parser/coverage.xml
+            resume-parser/web/test-results
+            /tmp/clearcv-evaluation.json
