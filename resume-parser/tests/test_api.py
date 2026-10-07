@@ -230,8 +230,7 @@ def test_match_endpoint_uses_stored_resume_without_reparsing(client):
         f"/api/matches/{record_id}",
         params={
             "job_description": (
-                "Backend Engineer. Required: Python and PostgreSQL. "
-                "Minimum 2+ years experience."
+                "Backend Engineer. Required: Python and PostgreSQL. Minimum 2+ years experience."
             )
         },
     )
@@ -244,8 +243,6 @@ def test_match_endpoint_uses_stored_resume_without_reparsing(client):
 
 def test_match_endpoint_rejects_empty_jd(client):
     record_id = upload(client).json()["id"]
-    response = client.post(
-        f"/api/matches/{record_id}", params={"job_description": "   "}
-    )
+    response = client.post(f"/api/matches/{record_id}", params={"job_description": "   "})
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "empty_job_description"
