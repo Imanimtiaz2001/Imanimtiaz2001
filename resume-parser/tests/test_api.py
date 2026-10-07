@@ -220,3 +220,32 @@ def test_unexpected_errors_do_not_log_resume_data(settings, monkeypatch, caplog)
         assert response.json()["error"]["code"] == "internal_error"
         assert "candidate-sensitive-123" not in response.text + caplog.text
         assert response.headers["X-Content-Type-Options"] == "nosniff"
+
+
+def test_match_endpoint_uses_stored_resume_without_reparsing(client):
+    parsed = upload(client)
+    assert parsed.status_code == 201
+    record_id = parsed.json()["id"]
+    response = client.post(
+        f"/api/matches/{record_id}",
+        params={
+            "job_description": (
+                "Backend Engineer. Required: Python and PostgreSQL. "
+                "Minimum 2+ years experience."
+            )
+        },
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert 0 <= payload["overall_score"] <= 100
+    assert "breakdown" in payload
+    assert payload["review_required"] is True
+
+
+def test_match_endpoint_rejects_empty_jd(client):
+    record_id = upload(client).json()["id"]
+    response = client.post(
+        f"/api/matches/{record_id}", params={"job_description": "   "}
+    )
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "empty_job_description"
