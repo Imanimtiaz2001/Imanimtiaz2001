@@ -1280,3 +1280,15 @@ footer a {
 .match-suggestions { grid-column: span 3; }
 .match-suggestions p { margin: 8px 0; }
 @media (max-width: 760px) { .match-report { grid-template-columns: 1fr; } .score-card, .match-column, .match-suggestions { grid-column: 1; } }
+
+.candidate-picker { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0 0 14px; max-height: 280px; overflow: auto; }
+.candidate-picker label { display: flex; gap: 9px; align-items: flex-start; border: 1px solid #d9dee7; border-radius: 8px; padding: 10px; cursor: pointer; }
+.candidate-picker small, .ranking-row small { display: block; opacity: .65; margin-top: 4px; overflow-wrap: anywhere; }
+.ranking-results { margin-top: 20px; border: 1px solid #d9dee7; border-radius: 12px; overflow: hidden; }
+.ranking-header, .ranking-row { display: flex; align-items: center; gap: 14px; padding: 13px 15px; border-bottom: 1px solid #edf0f4; }
+.ranking-header { justify-content: space-between; }
+.ranking-row:last-child { border-bottom: 0; }
+.ranking-row > strong { font-size: 18px; min-width: 34px; }
+.ranking-row > span { flex: 1; min-width: 0; }
+.ranking-row > b { font-size: 18px; }
+@media (max-width: 760px) { .candidate-picker { grid-template-columns: 1fr; } .ranking-row { flex-wrap: wrap; } .ranking-row > span { flex-basis: calc(100% - 55px); } }
