@@ -63,9 +63,7 @@ def parse_job_description(text: str) -> JobDescription:
 
     years = [
         float(value)
-        for value in re.findall(
-            r"(?<!\d)(\d{1,2}(?:\.\d+)?)\s*\+?\s*(?:years?|yrs?)\b", lower
-        )
+        for value in re.findall(r"(?<!\d)(\d{1,2}(?:\.\d+)?)\s*\+?\s*(?:years?|yrs?)\b", lower)
     ]
     minimum_years = max(years) if years else None
     if minimum_years is not None:
