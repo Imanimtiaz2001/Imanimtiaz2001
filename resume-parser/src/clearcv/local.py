@@ -249,10 +249,17 @@ def _heading_text(text: str) -> str:
 
 
 def heading(text: str) -> str | None:
-    """Classify a short section heading without depending on one exact label."""
-    if not text.strip() or len(text) > 90 or DATE_RANGE.search(text):
+    """Classify a short section heading without mistaking resume content for headings."""
+    stripped = text.strip()
+    if not stripped or len(stripped) > 90 or DATE_RANGE.search(stripped):
         return None
-    cleaned = _heading_text(text)
+
+    # "Languages: Python, Go" and similar labelled content are values, not headings.
+    # A bare "Languages" or "Technical Skills:" still falls through as a heading.
+    if re.match(r"^[^:]{1,40}:\\s*\\S", stripped):
+        return None
+
+    cleaned = _heading_text(stripped)
     if not cleaned or len(cleaned.split()) > 7:
         return None
     for section, names in SECTION_ALIASES.items():
@@ -260,33 +267,145 @@ def heading(text: str) -> str | None:
             return section
 
     tokens = set(cleaned.split())
-    if tokens & {"experience", "employment"}:
-        return "experience"
-    if "career" in tokens and tokens & {"history", "background", "experience"}:
-        return "experience"
-    if "work" in tokens and tokens & {"history", "background", "experience"}:
-        return "experience"
-    if tokens & {"education", "academic", "qualification", "qualifications"}:
-        return "education"
-    if tokens & {"skills", "competencies", "proficiencies", "technologies", "expertise"}:
-        return "skills"
-    if tokens & {
-        "projects",
-        "project",
-        "certifications",
-        "certificates",
-        "awards",
-        "publications",
-        "summary",
-        "profile",
-        "objective",
-        "languages",
-        "interests",
-        "volunteering",
-        "references",
-        "achievements",
-    }:
-        return "other"
+    vocabularies = {
+        "experience": {
+            "work",
+            "professional",
+            "relevant",
+            "employment",
+            "career",
+            "industry",
+            "internship",
+            "internships",
+            "experience",
+            "history",
+            "background",
+            "appointments",
+            "positions",
+            "leadership",
+            "summary",
+        },
+        "education": {
+            "education",
+            "academic",
+            "qualification",
+            "qualifications",
+            "training",
+            "studies",
+            "background",
+            "history",
+        },
+        "skills": {
+            "skills",
+            "skill",
+            "technical",
+            "key",
+            "core",
+            "professional",
+            "competencies",
+            "competency",
+            "proficiencies",
+            "proficiency",
+            "technologies",
+            "technology",
+            "tools",
+            "expertise",
+            "stack",
+            "programming",
+            "platforms",
+            "frameworks",
+            "libraries",
+            "databases",
+            "cloud",
+        },
+        "other": {
+            "projects",
+            "project",
+            "certifications",
+            "certification",
+            "certificates",
+            "certificate",
+            "licenses",
+            "license",
+            "awards",
+            "award",
+            "honors",
+            "honor",
+            "achievements",
+            "achievement",
+            "publications",
+            "publication",
+            "research",
+            "summary",
+            "profile",
+            "objective",
+            "languages",
+            "language",
+            "interests",
+            "interest",
+            "volunteering",
+            "volunteer",
+            "references",
+            "reference",
+            "activities",
+            "activity",
+            "contact",
+            "information",
+            "additional",
+            "personal",
+            "extracurricular",
+        },
+    }
+    triggers = {
+        "experience": {"experience", "employment", "career", "work"},
+        "education": {"education", "academic", "qualification", "qualifications", "studies"},
+        "skills": {
+            "skills",
+            "skill",
+            "competencies",
+            "competency",
+            "proficiencies",
+            "proficiency",
+            "expertise",
+            "stack",
+        },
+        "other": {
+            "projects",
+            "project",
+            "certifications",
+            "certification",
+            "certificates",
+            "certificate",
+            "licenses",
+            "license",
+            "awards",
+            "award",
+            "honors",
+            "honor",
+            "achievements",
+            "achievement",
+            "publications",
+            "publication",
+            "research",
+            "summary",
+            "profile",
+            "objective",
+            "languages",
+            "language",
+            "interests",
+            "interest",
+            "volunteering",
+            "volunteer",
+            "references",
+            "reference",
+            "activities",
+            "activity",
+            "contact",
+        },
+    }
+    for section in ("experience", "education", "skills", "other"):
+        if tokens <= vocabularies[section] and tokens & triggers[section]:
+            return section
     return None
 
 
