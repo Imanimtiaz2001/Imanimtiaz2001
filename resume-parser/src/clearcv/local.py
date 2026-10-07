@@ -15,19 +15,106 @@ from clearcv.schemas import Document, Education, Employment, Fact, ResumeFields,
 # section additionally supports arbitrary comma/pipe/bullet separated skill names,
 # so this list is an accelerator rather than the parser's vocabulary boundary.
 SKILLS = [
-    "Python", "JavaScript", "TypeScript", "Java", "Kotlin", "Swift", "C", "C++", "C#",
-    "Go", "Rust", "Ruby", "PHP", "Scala", "R", "MATLAB", "SQL", "HTML", "CSS", "Sass",
-    "FastAPI", "Django", "Flask", "React", "React Native", "Next.js", "Node.js", "Express.js",
-    "NestJS", "Angular", "Vue.js", "Svelte", "Flutter", "Spring", "Spring Boot", ".NET",
-    "PostgreSQL", "MySQL", "MariaDB", "SQL Server", "Oracle", "MongoDB", "DynamoDB",
-    "Redis", "Elasticsearch", "OpenSearch", "Snowflake", "BigQuery", "SQLite",
-    "Docker", "Kubernetes", "Helm", "AWS", "Azure", "GCP", "Lambda", "S3", "SNS", "SQS",
-    "Terraform", "Ansible", "Jenkins", "Git", "GitHub Actions", "GitLab CI", "Linux",
-    "PyTorch", "TensorFlow", "Keras", "scikit-learn", "Pandas", "NumPy", "Hugging Face",
-    "LangChain", "LangGraph", "LlamaIndex", "RAG", "Pinecone", "OpenAI", "MLflow",
-    "Celery", "Kafka", "RabbitMQ", "NLP", "REST", "REST API", "GraphQL", "gRPC",
-    "dbt", "Spark", "Databricks", "Airflow", "Prisma", "Jest", "Pytest", "Playwright",
-    "Cypress", "Figma", "Power BI", "Tableau",
+    "Python",
+    "JavaScript",
+    "TypeScript",
+    "Java",
+    "Kotlin",
+    "Swift",
+    "C",
+    "C++",
+    "C#",
+    "Go",
+    "Rust",
+    "Ruby",
+    "PHP",
+    "Scala",
+    "R",
+    "MATLAB",
+    "SQL",
+    "HTML",
+    "CSS",
+    "Sass",
+    "FastAPI",
+    "Django",
+    "Flask",
+    "React",
+    "React Native",
+    "Next.js",
+    "Node.js",
+    "Express.js",
+    "NestJS",
+    "Angular",
+    "Vue.js",
+    "Svelte",
+    "Flutter",
+    "Spring",
+    "Spring Boot",
+    ".NET",
+    "PostgreSQL",
+    "MySQL",
+    "MariaDB",
+    "SQL Server",
+    "Oracle",
+    "MongoDB",
+    "DynamoDB",
+    "Redis",
+    "Elasticsearch",
+    "OpenSearch",
+    "Snowflake",
+    "BigQuery",
+    "SQLite",
+    "Docker",
+    "Kubernetes",
+    "Helm",
+    "AWS",
+    "Azure",
+    "GCP",
+    "Lambda",
+    "S3",
+    "SNS",
+    "SQS",
+    "Terraform",
+    "Ansible",
+    "Jenkins",
+    "Git",
+    "GitHub Actions",
+    "GitLab CI",
+    "Linux",
+    "PyTorch",
+    "TensorFlow",
+    "Keras",
+    "scikit-learn",
+    "Pandas",
+    "NumPy",
+    "Hugging Face",
+    "LangChain",
+    "LangGraph",
+    "LlamaIndex",
+    "RAG",
+    "Pinecone",
+    "OpenAI",
+    "MLflow",
+    "Celery",
+    "Kafka",
+    "RabbitMQ",
+    "NLP",
+    "REST",
+    "REST API",
+    "GraphQL",
+    "gRPC",
+    "dbt",
+    "Spark",
+    "Databricks",
+    "Airflow",
+    "Prisma",
+    "Jest",
+    "Pytest",
+    "Playwright",
+    "Cypress",
+    "Figma",
+    "Power BI",
+    "Tableau",
 ]
 
 SECTION_ALIASES = {
@@ -128,9 +215,20 @@ def heading(text: str) -> str | None:
     if tokens & {"skills", "competencies", "proficiencies", "technologies", "expertise"}:
         return "skills"
     if tokens & {
-        "projects", "project", "certifications", "certificates", "awards", "publications",
-        "summary", "profile", "objective", "languages", "interests", "volunteering",
-        "references", "achievements",
+        "projects",
+        "project",
+        "certifications",
+        "certificates",
+        "awards",
+        "publications",
+        "summary",
+        "profile",
+        "objective",
+        "languages",
+        "interests",
+        "volunteering",
+        "references",
+        "achievements",
     }:
         return "other"
     return None
@@ -145,8 +243,19 @@ def name_candidate(text: str) -> bool:
     if any(
         word.casefold().strip(".,")
         in {
-            "resume", "curriculum", "vitae", "engineer", "developer", "manager", "analyst",
-            "consultant", "skills", "education", "contact", "experience", "profile",
+            "resume",
+            "curriculum",
+            "vitae",
+            "engineer",
+            "developer",
+            "manager",
+            "analyst",
+            "consultant",
+            "skills",
+            "education",
+            "contact",
+            "experience",
+            "profile",
         }
         for word in tokens
     ):
@@ -226,7 +335,12 @@ def _two_line_title(lines: list[SourceLine]) -> tuple[Fact | None, Fact | None]:
 
 
 def _sectioned(lines: list[SourceLine]) -> dict[str, list[SourceLine]]:
-    sections: dict[str, list[SourceLine]] = {"experience": [], "education": [], "skills": [], "other": []}
+    sections: dict[str, list[SourceLine]] = {
+        "experience": [],
+        "education": [],
+        "skills": [],
+        "other": [],
+    }
     current: str | None = None
     for line in lines:
         detected = heading(line.text)
@@ -304,7 +418,13 @@ def _education_from_lines(lines: list[SourceLine]) -> list[Education]:
                 institution = fact(cleaned, line)
         year = re.search(r"\b(?:19|20)\d{2}\b", line.text)
         graduation = fact(year[0], line) if year else None
-        if not degree and not institution and graduation and education and education[-1].graduation is None:
+        if (
+            not degree
+            and not institution
+            and graduation
+            and education
+            and education[-1].graduation is None
+        ):
             education[-1].graduation = graduation
             continue
         if degree or institution:
@@ -395,7 +515,9 @@ def extract_local(document: Document) -> ResumeFields:
         for i, line in enumerate(lines):
             if not DATE_RANGE.search(line.text):
                 continue
-            neighborhood = " ".join(item.text for item in lines[max(0, i - 2) : min(len(lines), i + 3)])
+            neighborhood = " ".join(
+                item.text for item in lines[max(0, i - 2) : min(len(lines), i + 3)]
+            )
             if ROLE_WORDS.search(neighborhood) or EMPLOYER_WORDS.search(neighborhood):
                 candidates.extend(lines[max(0, i - 2) : min(len(lines), i + 3)])
         # Preserve document order and remove duplicate line ids.
