@@ -216,7 +216,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 warnings.append("No education entries were identified.")
             if settings.provider == "local":
                 warnings.append(
-                    "Offline rules use a limited skill vocabulary and conventional section headers. Check omissions and field assignments."
+                    "Offline extraction uses evidence-grounded heuristics across common resume layouts. Check omissions and ambiguous field assignments."
                 )
             warnings.append(
                 "Human review is required. Source support does not prove semantic correctness or the authenticity of a resume."
@@ -226,7 +226,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 model=settings.openai_model if settings.provider == "openai" else None,
                 prompt_version=PROMPT_VERSION
                 if settings.provider == "openai"
-                else "local-rules-1.0",
+                else "local-rules-1.1",
                 fields=fields,
                 experience=experience,
                 document=document,

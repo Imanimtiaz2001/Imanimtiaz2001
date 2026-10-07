@@ -254,9 +254,12 @@ def heading(text: str) -> str | None:
     if not stripped or len(stripped) > 90 or DATE_RANGE.search(stripped):
         return None
 
+    # Short trailing annotations are common in headings, e.g. "Work Experience (4+ years)".
+    stripped = re.sub(r"\s*\([^)]{1,40}\)\s*$", "", stripped).strip()
+
     # "Languages: Python, Go" and similar labelled content are values, not headings.
     # A bare "Languages" or "Technical Skills:" still falls through as a heading.
-    if re.match(r"^[^:]{1,40}:\\s*\\S", stripped):
+    if re.match(r"^[^:]{1,40}:\s*\S", stripped):
         return None
 
     cleaned = _heading_text(stripped)
@@ -581,18 +584,34 @@ def _education_from_lines(lines: list[SourceLine]) -> list[Education]:
         if len(line.text) > 1200:
             continue
         degree = institution = None
+        date_range = DATE_RANGE.search(line.text)
+        trailing_range = (
+            date_range if date_range and not line.text[date_range.end() :].strip(" ,;|()") else None
+        )
+        # A range such as 2020–2024 represents attendance; graduation is its end.
+        year = re.search(r"\b(?:19|20)\d{2}\b", line.text)
+        graduation = (
+            fact(trailing_range["end"], line)
+            if trailing_range
+            else fact(year[0], line)
+            if year
+            else None
+        )
+
         # Keep commas inside degree names; pipes/semicolons are stronger field separators.
         parts = re.split(r"\s*[|;]\s*", line.text)
         for part in parts:
-            cleaned = re.sub(r"\s*\(?\b(?:19|20)\d{2}\b\)?\s*$", "", part).strip(" ,-")
+            part_range = DATE_RANGE.search(part)
+            if part_range and not part[part_range.end() :].strip(" ,()"):
+                cleaned = part[: part_range.start()].strip(" ,-–—")
+            else:
+                cleaned = re.sub(r"\s*\(?\b(?:19|20)\d{2}\b\)?\s*$", "", part).strip(" ,-")
             if not cleaned or len(cleaned) > 300:
                 continue
             if DEGREE.search(cleaned):
                 degree = fact(cleaned, line)
             elif INSTITUTION.search(cleaned):
                 institution = fact(cleaned, line)
-        year = re.search(r"\b(?:19|20)\d{2}\b", line.text)
-        graduation = fact(year[0], line) if year else None
         if (
             not degree
             and not institution

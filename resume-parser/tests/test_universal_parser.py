@@ -2,7 +2,8 @@ from datetime import date
 
 import pytest
 
-from clearcv.dates import DATE_RANGE, parse_date
+from clearcv.dates import DATE_RANGE, estimate, parse_date
+from clearcv.evidence import verify
 from clearcv.local import extract_local, heading
 from clearcv.schemas import Document, SourceLine
 
@@ -30,6 +31,8 @@ def document(*texts: str) -> Document:
         ("Tech Stack", "skills"),
         ("Tools & Technologies", "skills"),
         ("Licenses & Certifications", "other"),
+        ("Work Experience (4+ years)", "experience"),
+        ("Professional Experience (10 years)", "experience"),
     ],
 )
 def test_section_aliases(label, expected):
@@ -112,3 +115,52 @@ def test_extended_date_ranges(text):
     match = DATE_RANGE.search(text)
     assert match is not None
     assert parse_date(match["end"], date(2026, 10, 7)) is not None
+
+
+def test_shared_year_employment_range_is_parsed_and_counted():
+    resume = document(
+        "Avery Morgan",
+        "Work Experience (4+ years)",
+        "PTCL-Ufone — Full Stack Intern(Summer Spark) July–Aug 2023",
+        "Projects",
+    )
+    fields = extract_local(resume)
+    assert len(fields.employment) == 1
+    job = fields.employment[0]
+    assert job.employer.value == "PTCL-Ufone"
+    assert job.role.value == "Full Stack Intern(Summer Spark)"
+    assert job.start.value == "July"
+    assert job.end.value == "Aug 2023"
+    verify(fields, resume)
+
+    experience, warnings = estimate(fields.employment, date(2026, 10, 7))
+    assert experience.lower_months == experience.upper_months == 2
+    assert warnings == []
+
+
+def test_education_year_ranges_do_not_create_unsupported_evidence():
+    resume = document(
+        "Avery Morgan",
+        "Education",
+        "National University of Sciences and Technology (NUST) – Rawalpindi, Pakistan 2020–2024",
+        "Bachelor of Science in Computer Science",
+        "Punjab College – Rawalpindi, Pakistan 2017–2019",
+        "Intermediate Education, BISE RWP Board",
+        "Siddeeq Public School – Rawalpindi, Pakistan 2015–2017",
+        "Matriculation in Science, BISE RWP Board",
+        "Licenses & Certifications",
+    )
+    fields = extract_local(resume)
+    verify(fields, resume)
+
+    assert [item.graduation.value for item in fields.education] == ["2024", "2019", "2017"]
+    assert fields.education[0].institution.value == (
+        "National University of Sciences and Technology (NUST) – Rawalpindi, Pakistan"
+    )
+    assert fields.education[1].institution.value == "Punjab College – Rawalpindi, Pakistan"
+    assert fields.education[2].institution.value == "Siddeeq Public School – Rawalpindi, Pakistan"
+
+
+def test_colon_label_with_values_is_not_a_section_heading():
+    assert heading("Languages: Elixir, Zig, Solidity") is None
+    assert heading("Cloud: AWS, Azure, GCP") is None
