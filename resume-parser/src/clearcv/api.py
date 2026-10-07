@@ -20,7 +20,7 @@ from clearcv.db import Store
 from clearcv.evidence import EvidenceError, verify
 from clearcv.local import extract_local
 from clearcv.matching import match_resume_to_jd, parse_job_description
-from clearcv.matching.schemas import MatchReport
+from clearcv.matching.schemas import CandidateMatch, MatchReport, RankingReport, RankingRequest
 from clearcv.pdf import PDFError, extract_pdf
 from clearcv.provider import PROMPT_VERSION, ProviderError, extract_openai
 from clearcv.schemas import ParseResult, StoredResume
@@ -272,7 +272,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.post("/api/matches/{record_id}", response_model=MatchReport)
     def match_job(record_id: UUID, job_description: str):
-        """Compare a stored parsed resume with a job description without re-parsing the CV."""
+        """Compare a stored parsed resume with a JD without modifying or re-parsing the CV."""
         if not job_description.strip():
             raise HTTPException(
                 422,
@@ -284,8 +284,50 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 {"code": "job_description_too_large", "message": "Job description is too long."},
             )
         record = get_record(record_id)
-        jd = parse_job_description(job_description)
-        return match_resume_to_jd(record.result, jd)
+        return match_resume_to_jd(record.result, parse_job_description(job_description))
+
+    @app.post("/api/rankings", response_model=RankingReport)
+    def rank_candidates(payload: RankingRequest):
+        """Rank stored resumes against one JD using the same evidence-grounded matcher."""
+        jd = parse_job_description(payload.job_description)
+        seen = set()
+        candidates = []
+        for resume_id in payload.resume_ids:
+            if resume_id in seen:
+                continue
+            seen.add(resume_id)
+            try:
+                parsed_id = UUID(resume_id)
+            except ValueError as exc:
+                raise HTTPException(
+                    422,
+                    {"code": "invalid_resume_id", "message": "A resume ID is invalid."},
+                ) from exc
+            record = get_record(parsed_id)
+            report = match_resume_to_jd(record.result, jd)
+            candidates.append((record, report))
+        candidates.sort(
+            key=lambda item: (
+                -item[1].overall_score,
+                -item[1].breakdown.skills,
+                -item[1].breakdown.experience,
+                item[0].id,
+            )
+        )
+        return RankingReport(
+            job_title=jd.title,
+            candidates=[
+                CandidateMatch(
+                    resume_id=record.id,
+                    candidate_name=(
+                        record.result.fields.name.value if record.result.fields.name else None
+                    ),
+                    rank=index,
+                    report=report,
+                )
+                for index, (record, report) in enumerate(candidates, 1)
+            ],
+        )
 
     @app.get("/api/resumes")
     def history(limit: int = Query(20, ge=1, le=100), offset: int = Query(0, ge=0)):
