@@ -76,15 +76,32 @@ export type MatchItem = {
   required: boolean;
   jd_evidence: string;
   cv_evidence: string | null;
+  confidence: "exact" | "related" | "experience" | "missing";
+  explanation: string;
 };
 export type MatchReport = {
   overall_score: number;
-  breakdown: { skills: number; experience: number; requirements: number };
+  breakdown: { skills: number; experience: number; requirements: number; responsibilities: number; education: number };
   required_experience_years: number | null;
   detected_experience_years: number;
   experience_gap_years: number;
   matched: MatchItem[];
   missing: MatchItem[];
   suggestions: string[];
+  strengths: string[];
+  risks: string[];
+  summary: string;
+  review_required: true;
+};
+
+export type CandidateMatch = {
+  resume_id: string;
+  candidate_name: string | null;
+  rank: number;
+  report: MatchReport;
+};
+export type RankingReport = {
+  job_title: string | null;
+  candidates: CandidateMatch[];
   review_required: true;
 };
