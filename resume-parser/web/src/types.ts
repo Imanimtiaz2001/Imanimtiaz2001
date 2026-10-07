@@ -68,3 +68,23 @@ export type Config = {
   retention_hours: number;
   schema_version: string;
 };
+
+export type MatchItem = {
+  requirement: string;
+  kind: string;
+  matched: boolean;
+  required: boolean;
+  jd_evidence: string;
+  cv_evidence: string | null;
+};
+export type MatchReport = {
+  overall_score: number;
+  breakdown: { skills: number; experience: number; requirements: number };
+  required_experience_years: number | null;
+  detected_experience_years: number;
+  experience_gap_years: number;
+  matched: MatchItem[];
+  missing: MatchItem[];
+  suggestions: string[];
+  review_required: true;
+};
