@@ -113,3 +113,41 @@ def test_responsibility_and_education_requirements_are_explained():
     assert any(item.kind == "education" for item in report.matched)
     assert report.summary
     assert report.strengths
+
+
+def test_related_skill_gets_partial_explainable_credit():
+    result = make_result(
+        "Avery Morgan",
+        "Experience",
+        "Acme — Platform Engineer Jan 2022–Present",
+        "Deployed services to Google Cloud using Docker.",
+        "Skills",
+        "GCP, Docker",
+    )
+    report = match_resume_to_jd(
+        result, parse_job_description("Cloud Engineer\nAWS required.\nKubernetes preferred.")
+    )
+    aws = next(item for item in report.matched if item.requirement == "aws")
+    assert aws.confidence == "related"
+    assert aws.cv_evidence
+    assert 0 < report.breakdown.skills < 100
+
+
+def test_responsibility_and_education_requirements_are_explained():
+    result = make_result(
+        "Avery Morgan",
+        "Experience",
+        "Acme — Backend Engineer Jan 2021–Present",
+        "Designed and implemented scalable payment APIs for production systems.",
+        "Education",
+        "Example University — Bachelor of Computer Science 2020",
+    )
+    jd = parse_job_description(
+        "Backend Engineer\nMust design and implement scalable payment APIs.\n"
+        "Bachelor degree in Computer Science required."
+    )
+    report = match_resume_to_jd(result, jd)
+    assert any(item.kind == "responsibility" for item in report.matched)
+    assert any(item.kind == "education" for item in report.matched)
+    assert report.summary
+    assert report.strengths
