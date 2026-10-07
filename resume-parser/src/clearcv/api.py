@@ -19,6 +19,8 @@ from clearcv.dates import estimate
 from clearcv.db import Store
 from clearcv.evidence import EvidenceError, verify
 from clearcv.local import extract_local
+from clearcv.matching import match_resume_to_jd, parse_job_description
+from clearcv.matching.schemas import MatchReport
 from clearcv.pdf import PDFError, extract_pdf
 from clearcv.provider import PROMPT_VERSION, ProviderError, extract_openai
 from clearcv.schemas import ParseResult, StoredResume
@@ -267,6 +269,23 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         finally:
             durations.observe(time.perf_counter() - started)
             slots.release()
+
+    @app.post("/api/matches/{record_id}", response_model=MatchReport)
+    def match_job(record_id: UUID, job_description: str):
+        """Compare a stored parsed resume with a job description without re-parsing the CV."""
+        if not job_description.strip():
+            raise HTTPException(
+                422,
+                {"code": "empty_job_description", "message": "Job description is required."},
+            )
+        if len(job_description) > 30000:
+            raise HTTPException(
+                413,
+                {"code": "job_description_too_large", "message": "Job description is too long."},
+            )
+        record = get_record(record_id)
+        jd = parse_job_description(job_description)
+        return match_resume_to_jd(record.result, jd)
 
     @app.get("/api/resumes")
     def history(limit: int = Query(20, ge=1, le=100), offset: int = Query(0, ge=0)):
