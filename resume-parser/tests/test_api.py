@@ -255,9 +255,7 @@ def test_recruiter_ranking_orders_candidates_and_deduplicates(client):
         "/api/rankings",
         json={
             "resume_ids": [second, first, first],
-            "job_description": (
-                "Backend Engineer\nPython required.\nMinimum 2+ years experience."
-            ),
+            "job_description": ("Backend Engineer\nPython required.\nMinimum 2+ years experience."),
         },
     )
     assert response.status_code == 200, response.text
