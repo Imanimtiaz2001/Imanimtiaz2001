@@ -85,6 +85,19 @@ def parse_date(value: str, today: date) -> tuple[int, int] | None:
     return point, point
 
 
+def infer_shared_year_start(value: str, end: tuple[int, int] | None) -> tuple[int, int] | None:
+    """Infer a month-only start from a dated end such as July–Aug 2023."""
+    token = value.strip().lower().replace(".", "")
+    if token not in MONTHS or not end or end[0] != end[1]:
+        return None
+    end_year, zero_based_end_month = divmod(end[0], 12)
+    end_month = zero_based_end_month + 1
+    start_month = MONTHS[token]
+    start_year = end_year if start_month <= end_month else end_year - 1
+    point = month_index(start_year, start_month)
+    return point, point
+
+
 def union_months(intervals: list[tuple[int, int]]) -> int:
     """Half-open intervals; adjacency merges; ordering is irrelevant."""
     total = 0
@@ -107,6 +120,8 @@ def estimate(jobs: list[Employment], today: date) -> tuple[ExperienceEstimate, l
     for i, job in enumerate(jobs):
         start = parse_date(job.start.value, today) if job.start else None
         end = parse_date(job.end.value, today) if job.end else None
+        if not start and job.start:
+            start = infer_shared_year_start(job.start.value, end)
         if not start or not end:
             warnings.append(
                 f"employment[{i}]: missing or unsupported date; excluded from experience."
