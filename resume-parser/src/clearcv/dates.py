@@ -24,7 +24,8 @@ MONTHS = {
         ]
     )
 }
-MONTHS.update({key[:3]: value for key, value in list(MONTHS.items())})\nMONTHS["sept"] = 9
+MONTHS.update({key[:3]: value for key, value in list(MONTHS.items())})
+MONTHS["sept"] = 9
 MONTH_PATTERN = "(?:" + "|".join(sorted(MONTHS, key=len, reverse=True)) + ")"
 DATE_TOKEN = rf"(?:\d{{4}}[-/]\d{{1,2}}[-/]\d{{1,2}}|(?:\d{{1,2}}\s+)?{MONTH_PATTERN}\.?\s+(?:\d{{1,2}},?\s+)?\d{{4}}|\d{{4}}[-/]\d{{1,2}}|\d{{1,2}}/\d{{4}}|\d{{4}}|Present|Current|Now|Ongoing|Today|Till\s+Date|To\s+Date)"
 DATE_RANGE = re.compile(
