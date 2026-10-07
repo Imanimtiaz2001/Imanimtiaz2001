@@ -29,9 +29,7 @@ MONTHS["sept"] = 9
 MONTH_PATTERN = "(?:" + "|".join(sorted(MONTHS, key=len, reverse=True)) + ")"
 DATE_TOKEN = rf"(?:\d{{4}}[-/]\d{{1,2}}[-/]\d{{1,2}}|(?:\d{{1,2}}\s+)?{MONTH_PATTERN}\.?\s+(?:\d{{1,2}},?\s+)?\d{{4}}|\d{{4}}[-/]\d{{1,2}}|\d{{1,2}}/\d{{4}}|\d{{4}}|Present|Current|Now|Ongoing|Today|Till\s+Date|To\s+Date)"
 RANGE_SEPARATOR = r"(?:[-–—]|\bto\b|\buntil\b|\bthrough\b|\bthru\b)"
-SHARED_YEAR_START = (
-    rf"{MONTH_PATTERN}\.?(?=\s*{RANGE_SEPARATOR}\s*{MONTH_PATTERN}\.?\s+\d{{4}})"
-)
+SHARED_YEAR_START = rf"{MONTH_PATTERN}\.?(?=\s*{RANGE_SEPARATOR}\s*{MONTH_PATTERN}\.?\s+\d{{4}})"
 DATE_RANGE = re.compile(
     rf"(?<!\w)(?P<start>{DATE_TOKEN}|{SHARED_YEAR_START})"
     rf"\s*{RANGE_SEPARATOR}\s*(?P<end>{DATE_TOKEN})(?!\d)",
