@@ -71,12 +71,30 @@ RELATED_SKILLS = {
 }
 
 EDUCATION_TERMS = (
-    "bachelor", "master", "phd", "doctorate", "degree", "computer science",
-    "software engineering", "information technology", "engineering",
+    "bachelor",
+    "master",
+    "phd",
+    "doctorate",
+    "degree",
+    "computer science",
+    "software engineering",
+    "information technology",
+    "engineering",
 )
 RESPONSIBILITY_VERBS = (
-    "build", "develop", "design", "implement", "lead", "manage", "architect",
-    "maintain", "deploy", "integrate", "optimize", "collaborate", "test",
+    "build",
+    "develop",
+    "design",
+    "implement",
+    "lead",
+    "manage",
+    "architect",
+    "maintain",
+    "deploy",
+    "integrate",
+    "optimize",
+    "collaborate",
+    "test",
 )
 
 
