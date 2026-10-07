@@ -24,9 +24,9 @@ MONTHS = {
         ]
     )
 }
-MONTHS.update({key[:3]: value for key, value in list(MONTHS.items())})
+MONTHS.update({key[:3]: value for key, value in list(MONTHS.items())})\nMONTHS["sept"] = 9
 MONTH_PATTERN = "(?:" + "|".join(sorted(MONTHS, key=len, reverse=True)) + ")"
-DATE_TOKEN = rf"(?:\d{{4}}[-/]\d{{1,2}}[-/]\d{{1,2}}|(?:\d{{1,2}}\s+)?{MONTH_PATTERN}\.?\s+(?:\d{{1,2}},?\s+)?\d{{4}}|\d{{4}}[-/]\d{{1,2}}|\d{{1,2}}/\d{{4}}|\d{{4}}|Present|Current|Now)"
+DATE_TOKEN = rf"(?:\d{{4}}[-/]\d{{1,2}}[-/]\d{{1,2}}|(?:\d{{1,2}}\s+)?{MONTH_PATTERN}\.?\s+(?:\d{{1,2}},?\s+)?\d{{4}}|\d{{4}}[-/]\d{{1,2}}|\d{{1,2}}/\d{{4}}|\d{{4}}|Present|Current|Now|Ongoing|Today|Till\\s+Date|To\\s+Date)"
 DATE_RANGE = re.compile(
     rf"(?<!\w)(?P<start>{DATE_TOKEN})\s*(?:[-–—]|\bto\b)\s*(?P<end>{DATE_TOKEN})(?!\d)", re.I
 )
@@ -39,7 +39,7 @@ def month_index(year: int, month: int) -> int:
 def parse_date(value: str, today: date) -> tuple[int, int] | None:
     """Return earliest/latest month; no day-level precision is claimed."""
     value = value.strip().lower().replace(".", "")
-    if value in {"present", "current", "now"}:
+    if re.fullmatch(r"(?:present|current|now|ongoing|today|till\\s+date|to\\s+date)", value):
         point = month_index(today.year, today.month)
         return point, point
     full = re.fullmatch(r"(\d{4})[-/](\d{1,2})[-/](\d{1,2})", value)
