@@ -10,9 +10,30 @@ from clearcv.matching.schemas import (
 from clearcv.schemas import ParseResult
 
 STOP_WORDS = {
-    "and", "the", "with", "for", "from", "that", "this", "your", "you", "our",
-    "will", "have", "has", "are", "into", "using", "work", "working", "years",
-    "experience", "required", "preferred", "responsible", "ability",
+    "and",
+    "the",
+    "with",
+    "for",
+    "from",
+    "that",
+    "this",
+    "your",
+    "you",
+    "our",
+    "will",
+    "have",
+    "has",
+    "are",
+    "into",
+    "using",
+    "work",
+    "working",
+    "years",
+    "experience",
+    "required",
+    "preferred",
+    "responsible",
+    "ability",
 }
 
 
@@ -147,7 +168,11 @@ def match_resume_to_jd(result: ParseResult, jd: JobDescription) -> MatchReport:
         (requirement_score, 0.05, bool(required_items)),
     ]
     weight = sum(item[1] for item in available if item[2])
-    overall = round(sum(score * factor for score, factor, used in available if used) / weight) if weight else 100
+    overall = (
+        round(sum(score * factor for score, factor, used in available if used) / weight)
+        if weight
+        else 100
+    )
 
     strengths = [f"{item.requirement}: {item.explanation}" for item in matched[:8]]
     risks = [
@@ -165,13 +190,17 @@ def match_resume_to_jd(result: ParseResult, jd: JobDescription) -> MatchReport:
                 f"Show a concrete achievement demonstrating: {item.requirement[:100]}"
             )
         elif item.kind == "education":
-            suggestions.append("Make the relevant qualification explicit if the CV already supports it.")
+            suggestions.append(
+                "Make the relevant qualification explicit if the CV already supports it."
+            )
     if gap:
         suggestions.append(
             f"The JD asks for {required:g} years; ClearCV detected {detected:g}, a {gap:g}-year gap."
         )
     if not suggestions:
-        suggestions.append("No major supported gaps detected; verify evidence and role context manually.")
+        suggestions.append(
+            "No major supported gaps detected; verify evidence and role context manually."
+        )
 
     return MatchReport(
         overall_score=overall,
