@@ -109,3 +109,32 @@ test("interactive API docs use local assets without browser errors", async ({
   await expect(page.locator(".swagger-ui")).toContainText("/api/resumes");
   expect(errors).toEqual([]);
 });
+
+
+test("candidate match and recruiter ranking workflows are usable", async ({ page }) => {
+  await page.goto("/");
+  for (const caseName of ["standard", "year-only"]) {
+    await page.getByRole("button", { name: caseName, exact: true }).click();
+    await page.getByRole("button", { name: "Extract resume", exact: true }).click();
+    await expect(page.getByText("Schema validated · review required")).toBeVisible();
+  }
+
+  await page.getByRole("button", { name: /CV ↔ JD Match/ }).click();
+  await page.getByLabel("Job description").fill(
+    "Backend Engineer\nPython required.\nMinimum 2+ years experience.",
+  );
+  await page.getByRole("button", { name: "Analyze match" }).click();
+  await expect(page.getByText("Overall alignment")).toBeVisible();
+  await expect(page.getByText("Improvement guidance")).toBeVisible();
+
+  await page.getByRole("button", { name: /Rank candidates/ }).click();
+  await page.getByLabel("Recruiter job description").fill(
+    "Backend Engineer\nPython required.\nMinimum 2+ years experience.",
+  );
+  const boxes = page.locator(".candidate-picker input[type=checkbox]");
+  await boxes.nth(0).check();
+  await boxes.nth(1).check();
+  await page.getByRole("button", { name: /Rank 2 candidate/ }).click();
+  await expect(page.getByRole("heading", { name: "Candidate ranking" })).toBeVisible();
+  await expect(page.locator(".ranking-row")).toHaveCount(2);
+});

@@ -246,3 +246,35 @@ def test_match_endpoint_rejects_empty_jd(client):
     response = client.post(f"/api/matches/{record_id}", params={"job_description": "   "})
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "empty_job_description"
+
+
+def test_recruiter_ranking_orders_candidates_and_deduplicates(client):
+    first = upload(client).json()["id"]
+    second = upload(client, case="year-only").json()["id"]
+    response = client.post(
+        "/api/rankings",
+        json={
+            "resume_ids": [second, first, first],
+            "job_description": ("Backend Engineer\nPython required.\nMinimum 2+ years experience."),
+        },
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert len(payload["candidates"]) == 2
+    assert [item["rank"] for item in payload["candidates"]] == [1, 2]
+    assert (
+        payload["candidates"][0]["report"]["overall_score"]
+        >= payload["candidates"][1]["report"]["overall_score"]
+    )
+    assert payload["review_required"] is True
+
+
+def test_recruiter_ranking_rejects_missing_resume(client):
+    response = client.post(
+        "/api/rankings",
+        json={
+            "resume_ids": ["00000000-0000-0000-0000-000000000000"],
+            "job_description": "Engineer\nPython required.",
+        },
+    )
+    assert response.status_code == 404
