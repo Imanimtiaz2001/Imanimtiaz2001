@@ -72,9 +72,9 @@ def _skill_match(skill: str, evidence: list[tuple[str, str]]) -> tuple[str | Non
 
 def _tokens(value: str) -> set[str]:
     return {
-        token
+        normalized
         for token in re.findall(r"[a-z][a-z0-9+#./-]{2,}", value.lower())
-        if token not in STOP_WORDS
+        if (normalized := token.strip("./-")) and normalized not in STOP_WORDS
     }
 
 
