@@ -586,9 +586,7 @@ def _education_from_lines(lines: list[SourceLine]) -> list[Education]:
         degree = institution = None
         date_range = DATE_RANGE.search(line.text)
         trailing_range = (
-            date_range
-            if date_range and not line.text[date_range.end() :].strip(" ,;|()")
-            else None
+            date_range if date_range and not line.text[date_range.end() :].strip(" ,;|()") else None
         )
         # A range such as 2020–2024 represents attendance; graduation is its end.
         year = re.search(r"\b(?:19|20)\d{2}\b", line.text)
@@ -607,9 +605,7 @@ def _education_from_lines(lines: list[SourceLine]) -> list[Education]:
             if part_range and not part[part_range.end() :].strip(" ,()"):
                 cleaned = part[: part_range.start()].strip(" ,-–—")
             else:
-                cleaned = re.sub(
-                    r"\s*\(?\b(?:19|20)\d{2}\b\)?\s*$", "", part
-                ).strip(" ,-")
+                cleaned = re.sub(r"\s*\(?\b(?:19|20)\d{2}\b\)?\s*$", "", part).strip(" ,-")
             if not cleaned or len(cleaned) > 300:
                 continue
             if DEGREE.search(cleaned):
