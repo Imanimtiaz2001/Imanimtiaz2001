@@ -56,9 +56,7 @@ def test_match_report_is_explainable_and_keeps_parse_result_unchanged():
     report = match_resume_to_jd(result, jd)
 
     assert report.overall_score > 0
-    assert {"python", "fastapi", "postgresql"} <= {
-        item.requirement for item in report.matched
-    }
+    assert {"python", "fastapi", "postgresql"} <= {item.requirement for item in report.matched}
     assert "docker" in {item.requirement for item in report.missing}
     assert report.experience_gap_years == 0
     assert result.model_dump() == original
