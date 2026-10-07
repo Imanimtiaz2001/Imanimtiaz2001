@@ -65,7 +65,9 @@ def match_resume_to_jd(result: ParseResult, jd: JobDescription) -> MatchReport:
     detected = result.experience.lower_years
     required = jd.minimum_years
     gap = max(0.0, round((required or 0.0) - detected, 2))
-    experience_score = 100 if required is None else min(100, round(100 * detected / required)) if required else 100
+    experience_score = (
+        100 if required is None else min(100, round(100 * detected / required)) if required else 100
+    )
     if required is not None:
         exp_req = next(req for req in jd.requirements if req.kind == "experience")
         exp_item = RequirementMatch(
@@ -98,7 +100,9 @@ def match_resume_to_jd(result: ParseResult, jd: JobDescription) -> MatchReport:
             f"The JD asks for {required:g} years; ClearCV detected {detected:g}, a {gap:g}-year gap."
         )
     if not suggestions:
-        suggestions.append("No major Phase 1 gaps were detected; review the evidence before making a decision.")
+        suggestions.append(
+            "No major Phase 1 gaps were detected; review the evidence before making a decision."
+        )
 
     return MatchReport(
         overall_score=overall,
