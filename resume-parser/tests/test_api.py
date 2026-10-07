@@ -264,7 +264,10 @@ def test_recruiter_ranking_orders_candidates_and_deduplicates(client):
     payload = response.json()
     assert len(payload["candidates"]) == 2
     assert [item["rank"] for item in payload["candidates"]] == [1, 2]
-    assert payload["candidates"][0]["report"]["overall_score"] >= payload["candidates"][1]["report"]["overall_score"]
+    assert (
+        payload["candidates"][0]["report"]["overall_score"]
+        >= payload["candidates"][1]["report"]["overall_score"]
+    )
     assert payload["review_required"] is True
 
 
