@@ -15,7 +15,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import type { Config, Fact, HistoryItem, RecordResult } from "./types";
+import type { Config, Fact, HistoryItem, MatchReport, RecordResult } from "./types";
 import "./style.css";
 
 const examples = [
@@ -68,6 +68,10 @@ function App() {
   const [activeFact, setActiveFact] = useState<Fact | null>(null);
   const [tab, setTab] = useState<"fields" | "json">("fields");
   const [consent, setConsent] = useState(false);
+  const [workspace, setWorkspace] = useState<"parser" | "match">("parser");
+  const [jobDescription, setJobDescription] = useState("");
+  const [matchReport, setMatchReport] = useState<MatchReport | null>(null);
+  const [matchBusy, setMatchBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const input = useRef<HTMLInputElement>(null);
@@ -217,6 +221,23 @@ function App() {
     }
   }
 
+  async function runMatch() {
+    if (!record || !jobDescription.trim() || matchBusy) return;
+    setMatchBusy(true);
+    setError("");
+    try {
+      const params = new URLSearchParams({ job_description: jobDescription });
+      const response = await request(`/api/matches/${record.id}?${params}`, {
+        method: "POST",
+      });
+      setMatchReport(await response.json());
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setMatchBusy(false);
+    }
+  }
+
   async function exportFile(format: string) {
     if (!record) return;
     setActionBusy(true);
@@ -281,9 +302,12 @@ function App() {
           Recent documents
         </button>
         <div className="nav-label">WORKSPACE</div>
-        <div className="nav-active">
+        <button className={`nav-active ${workspace === "parser" ? "" : "nav-secondary"}`} onClick={() => setWorkspace("parser")}>
           <FileCheck2 size={18} /> Resume parser <span>01</span>
-        </div>
+        </button>
+        <button className={`nav-active ${workspace === "match" ? "" : "nav-secondary"}`} onClick={() => setWorkspace("match")}>
+          <ScanLine size={18} /> CV ↔ JD Match <span>02</span>
+        </button>
         <div className="history-title">
           <span>RECENT DOCUMENTS</span>
           <button
@@ -394,6 +418,53 @@ function App() {
             </span>
           </div>
         </section>
+
+        {workspace === "match" && (
+          <section className="match-workspace">
+            <div className="eyebrow">MATCH INTELLIGENCE</div>
+            <h2>Compare this CV with a job description</h2>
+            <p>ClearCV compares requirements against evidence in the parsed resume. The score is decision support, not a hiring decision.</p>
+            {!record ? (
+              <div className="match-empty">Parse or open a resume from Recent Documents first.</div>
+            ) : (
+              <>
+                <textarea
+                  aria-label="Job description"
+                  placeholder="Paste the complete job description here…"
+                  value={jobDescription}
+                  maxLength={30000}
+                  onChange={(e) => {
+                    setJobDescription(e.target.value);
+                    setMatchReport(null);
+                  }}
+                />
+                <button className="primary-button" disabled={!jobDescription.trim() || matchBusy} onClick={runMatch}>
+                  {matchBusy ? <LoaderCircle className="spin" size={17} /> : <ScanLine size={17} />}
+                  {matchBusy ? "Comparing…" : "Analyze match"}
+                </button>
+                {matchReport && (
+                  <div className="match-report">
+                    <div className="score-card"><strong>{matchReport.overall_score}%</strong><span>Overall alignment</span></div>
+                    <div className="score-card"><strong>{matchReport.breakdown.skills}%</strong><span>Skills</span></div>
+                    <div className="score-card"><strong>{matchReport.breakdown.experience}%</strong><span>Experience</span></div>
+                    <div className="match-column">
+                      <h3>Matched requirements</h3>
+                      {matchReport.matched.map((item, i) => <div className="match-item good" key={`m-${i}`}><Check size={15}/><span><b>{item.requirement}</b><small>{item.cv_evidence}</small></span></div>)}
+                    </div>
+                    <div className="match-column">
+                      <h3>Missing / gap areas</h3>
+                      {matchReport.missing.map((item, i) => <div className="match-item gap" key={`g-${i}`}><X size={15}/><span><b>{item.requirement}</b><small>JD: {item.jd_evidence}</small></span></div>)}
+                    </div>
+                    <div className="match-suggestions">
+                      <h3>Improvement guidance</h3>
+                      {matchReport.suggestions.map((item, i) => <p key={i}>{item}</p>)}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </section>
+        )}
 
         {locked && (
           <form
