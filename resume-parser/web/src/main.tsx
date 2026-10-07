@@ -15,7 +15,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import type { Config, Fact, HistoryItem, MatchReport, RecordResult } from "./types";
+import type { Config, Fact, HistoryItem, MatchReport, RankingReport, RecordResult } from "./types";
 import "./style.css";
 
 const examples = [
@@ -68,10 +68,12 @@ function App() {
   const [activeFact, setActiveFact] = useState<Fact | null>(null);
   const [tab, setTab] = useState<"fields" | "json">("fields");
   const [consent, setConsent] = useState(false);
-  const [workspace, setWorkspace] = useState<"parser" | "match">("parser");
+  const [workspace, setWorkspace] = useState<"parser" | "match" | "rank">("parser");
   const [jobDescription, setJobDescription] = useState("");
   const [matchReport, setMatchReport] = useState<MatchReport | null>(null);
   const [matchBusy, setMatchBusy] = useState(false);
+  const [selectedCandidates, setSelectedCandidates] = useState<string[]>([]);
+  const [ranking, setRanking] = useState<RankingReport | null>(null);
   const [dragging, setDragging] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const input = useRef<HTMLInputElement>(null);
@@ -238,6 +240,65 @@ function App() {
     }
   }
 
+  async function runRanking() {
+    if (!selectedCandidates.length || !jobDescription.trim() || matchBusy) return;
+    setMatchBusy(true);
+    setError("");
+    try {
+      const response = await request("/api/rankings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          resume_ids: selectedCandidates,
+          job_description: jobDescription,
+        }),
+      });
+      setRanking(await response.json());
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setMatchBusy(false);
+    }
+  }
+
+  function exportMatchReport() {
+    if (!matchReport || !record) return;
+    const blob = new Blob([JSON.stringify(matchReport, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `match-${record.id}.json`;
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function exportRanking() {
+    if (!ranking) return;
+    const rows = [
+      ["rank", "candidate", "resume_id", "overall", "skills", "experience", "requirements"],
+      ...ranking.candidates.map((item) => [
+        item.rank,
+        item.candidate_name ?? "",
+        item.resume_id,
+        item.report.overall_score,
+        item.report.breakdown.skills,
+        item.report.breakdown.experience,
+        item.report.breakdown.requirements,
+      ]),
+    ];
+    const csv = rows
+      .map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(","))
+      .join("\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "candidate-ranking.csv";
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
   async function exportFile(format: string) {
     if (!record) return;
     setActionBusy(true);
@@ -307,6 +368,9 @@ function App() {
         </button>
         <button className={`nav-active ${workspace === "match" ? "" : "nav-secondary"}`} onClick={() => setWorkspace("match")}>
           <ScanLine size={18} /> CV ↔ JD Match <span>02</span>
+        </button>
+        <button className={`nav-active ${workspace === "rank" ? "" : "nav-secondary"}`} onClick={() => setWorkspace("rank")}>
+          <FileText size={18} /> Rank candidates <span>03</span>
         </button>
         <div className="history-title">
           <span>RECENT DOCUMENTS</span>
@@ -385,7 +449,7 @@ function App() {
       <main>
         <header>
           <span>
-            Workspace <ChevronRight size={13} /> <strong>Resume parser</strong>
+            Workspace <ChevronRight size={13} /> <strong>{workspace === "parser" ? "Resume parser" : workspace === "match" ? "CV ↔ JD Match" : "Candidate ranking"}</strong>
           </span>
           <div className="mode">
             <i />
@@ -447,21 +511,74 @@ function App() {
                     <div className="score-card"><strong>{matchReport.overall_score}%</strong><span>Overall alignment</span></div>
                     <div className="score-card"><strong>{matchReport.breakdown.skills}%</strong><span>Skills</span></div>
                     <div className="score-card"><strong>{matchReport.breakdown.experience}%</strong><span>Experience</span></div>
+                    <div className="score-card"><strong>{matchReport.breakdown.responsibilities}%</strong><span>Responsibilities</span></div>
+                    <div className="score-card"><strong>{matchReport.breakdown.education}%</strong><span>Education</span></div>
+                    <div className="score-card"><strong>{matchReport.breakdown.requirements}%</strong><span>Required items</span></div>
                     <div className="match-column">
                       <h3>Matched requirements</h3>
-                      {matchReport.matched.map((item, i) => <div className="match-item good" key={`m-${i}`}><Check size={15}/><span><b>{item.requirement}</b><small>{item.cv_evidence}</small></span></div>)}
+                      {matchReport.matched.map((item, i) => <div className="match-item good" key={`m-${i}`}><Check size={15}/><span><b>{item.requirement}</b><small>{item.explanation} · Evidence: {item.cv_evidence}</small></span></div>)}
                     </div>
                     <div className="match-column">
                       <h3>Missing / gap areas</h3>
-                      {matchReport.missing.map((item, i) => <div className="match-item gap" key={`g-${i}`}><X size={15}/><span><b>{item.requirement}</b><small>JD: {item.jd_evidence}</small></span></div>)}
+                      {matchReport.missing.map((item, i) => <div className="match-item gap" key={`g-${i}`}><X size={15}/><span><b>{item.requirement}</b><small>{item.explanation} · JD: {item.jd_evidence}</small></span></div>)}
                     </div>
                     <div className="match-suggestions">
                       <h3>Improvement guidance</h3>
+                      <p><b>{matchReport.summary}</b></p>
                       {matchReport.suggestions.map((item, i) => <p key={i}>{item}</p>)}
+                      <button className="secondary" onClick={exportMatchReport}>Export match JSON</button>
                     </div>
                   </div>
                 )}
               </>
+            )}
+          </section>
+        )}
+
+        {workspace === "rank" && (
+          <section className="match-workspace recruiter-workspace">
+            <div className="eyebrow">RECRUITER INTELLIGENCE</div>
+            <h2>Rank candidates against one job description</h2>
+            <p>Select up to 50 parsed resumes. Ranking uses the same evidence-backed scoring and always requires human review.</p>
+            <textarea
+              aria-label="Recruiter job description"
+              placeholder="Paste the job description used for all candidates…"
+              value={jobDescription}
+              maxLength={30000}
+              onChange={(e) => { setJobDescription(e.target.value); setRanking(null); }}
+            />
+            <div className="candidate-picker">
+              {history.map((item) => (
+                <label key={item.id}>
+                  <input
+                    type="checkbox"
+                    checked={selectedCandidates.includes(item.id)}
+                    onChange={(e) => setSelectedCandidates((current) =>
+                      e.target.checked
+                        ? [...current, item.id].slice(0, 50)
+                        : current.filter((id) => id !== item.id)
+                    )}
+                  />
+                  <span>{item.name ?? "Unknown name"}<small>{item.id}</small></span>
+                </label>
+              ))}
+            </div>
+            <button className="primary-button" disabled={!selectedCandidates.length || !jobDescription.trim() || matchBusy} onClick={runRanking}>
+              {matchBusy ? <LoaderCircle className="spin" size={17} /> : <ScanLine size={17} />}
+              {matchBusy ? "Ranking…" : `Rank ${selectedCandidates.length} candidate(s)`}
+            </button>
+            {ranking && (
+              <div className="ranking-results">
+                <div className="ranking-header"><h3>Candidate ranking</h3><button className="secondary" onClick={exportRanking}>Export CSV</button></div>
+                {ranking.candidates.map((candidate) => (
+                  <div className="ranking-row" key={candidate.resume_id}>
+                    <strong>#{candidate.rank}</strong>
+                    <span>{candidate.candidate_name ?? "Unknown candidate"}<small>{candidate.report.summary}</small></span>
+                    <b>{candidate.report.overall_score}%</b>
+                    <button className="secondary" onClick={() => { open(candidate.resume_id); setWorkspace("match"); setMatchReport(candidate.report); }}>Review evidence</button>
+                  </div>
+                ))}
+              </div>
             )}
           </section>
         )}
